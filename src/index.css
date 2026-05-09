@@ -1,0 +1,22 @@
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+body {
+  font-family: 'Inter', sans-serif;
+  background-color: #090A0F;
+  color: #F8FAFC;
+}
+
+/* Ocultar widgets flotantes para limpiar el Monitor */
+iframe[name="vapi-widget"], 
+.vapi-btn, 
+#vapi-widget-container,
+.auken-chat-widget,
+[class*="chat-widget"],
+[id*="chat-widget"] {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}

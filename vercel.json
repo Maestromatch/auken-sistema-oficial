@@ -1,0 +1,25 @@
+{
+  "rewrites": [
+    { "source": "/((?!api).*)", "destination": "/" }
+  ],
+  "crons": [
+    {
+      "path": "/api/process-queue",
+      "schedule": "* * * * *"
+    }
+  ],
+  "functions": {
+    "api/webhook.js": {
+      "maxDuration": 10
+    },
+    "api/process-queue.js": {
+      "maxDuration": 60
+    },
+    "api/chat.js": {
+      "maxDuration": 30
+    },
+    "api/vision.js": {
+      "maxDuration": 30
+    }
+  }
+}
