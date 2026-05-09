@@ -22,7 +22,7 @@ export default async function handler(req, res) {
     "SUPABASE_SERVICE_ROLE_KEY",
     "WHATSAPP_TOKEN",
     "PHONE_NUMBER_ID",
-    "WHATSAPP_VERIFY_TOKEN",
+    "VERIFY_TOKEN",
     "WORKER_SECRET",
   ];
 
