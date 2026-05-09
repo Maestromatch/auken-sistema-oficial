@@ -142,7 +142,7 @@ export default function AukenOptica() {
                       boxShadow: m.remitente === "cliente" ? "none" : "0 8px 20px rgba(251, 146, 60, 0.2)"
                     }}>{m.contenido}</div>
                     <div style={{ fontSize: 9, color: C.inkMid, marginTop: 6, textAlign: m.remitente === "cliente" ? "left" : "right", textTransform: "uppercase" }}>
-                      {new Date(m.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} · {m.remitente === "cliente" ? "RECIBIDO" : "IA AUKÉN"}
+                      {new Date(m.created_at).toLocaleTimeString([], {hour:'2-digit', minute:'2-digit'})} · {m.remitente === "cliente" ? "RECIBIDO" : (m.remitente === "admin" ? "HUMANO" : "IA AUKÉN")}
                     </div>
                   </div>
                 ))}
