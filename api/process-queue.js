@@ -167,7 +167,7 @@ async function processPhoneQueue(supabase, phone, messages) {
     // Log de costos
     logApiCall(supabase, {
       opticaId: configCache?.id || paciente?.optica_id,
-      conversacionId: convId,
+      conversacionId: conv?.id,
       model: MODELS.CHAT,
       usage: claude.usage,
       costUsd: claude.costUsd,
