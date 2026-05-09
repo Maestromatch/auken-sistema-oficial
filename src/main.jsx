@@ -4,6 +4,7 @@ import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
 import AukenOptica from './pages/AukenOptica'
 import AukenOpticaDashboard from './pages/AukenOpticaDashboard'
 import AukenLogin from './pages/AukenLogin'
+import AukenAdmin from './pages/AukenAdmin'
 
 const ProtectedRoute = ({ children }) => {
   const auth = localStorage.getItem("auken_auth");
@@ -15,6 +16,7 @@ ReactDOM.createRoot(document.getElementById('root')).render(
     <BrowserRouter>
       <Routes>
         <Route path="/login" element={<AukenLogin />} />
+        <Route path="/admin" element={<AukenAdmin />} />
         <Route path="/" element={<ProtectedRoute><AukenOptica /></ProtectedRoute>} />
         <Route path="/dashboard" element={<ProtectedRoute><AukenOpticaDashboard /></ProtectedRoute>} />
         {/* Redirección por defecto */}
