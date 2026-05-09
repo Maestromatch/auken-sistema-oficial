@@ -116,6 +116,22 @@ function QueueMonitor() {
             </span>
           </div>
         </div>
+        <button 
+          onClick={async () => {
+            const secret = prompt("Ingrese WORKER_SECRET para autorizar:");
+            if(!secret) return;
+            const res = await fetch("/api/process-queue", { 
+              method: "POST", 
+              headers: { "x-worker-secret": secret, "content-type": "application/json" },
+              body: JSON.stringify({ trigger: "manual_force" })
+            });
+            const data = await res.json();
+            alert(data.success ? "¡IA Despertada! Procesando cola..." : "Error: " + (data.error || "Secreto incorrecto"));
+          }}
+          style={{ background: "rgba(251, 146, 60, 0.1)", border: `1px solid ${C.primary}`, color: C.primary, padding: "8px 16px", borderRadius: 8, fontSize: 11, fontWeight: 700, cursor: "pointer" }}
+        >
+          ⚡ FORZAR DESPERTAR IA
+        </button>
       </div>
 
       <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 16 }}>
@@ -471,14 +487,25 @@ function PatientModal({ patient, opticaId, onClose, refresh }) {
   const save = async () => {
     if (!edit.nombre) { alert("El nombre es obligatorio"); return; }
     const payload = { ...edit, optica_id: opticaId };
-    if (isNew) {
-      await supabase.from("pacientes").insert([payload]);
-    } else {
-      const { id, ...rest } = payload;
-      await supabase.from("pacientes").update(rest).eq("id", id);
+    try {
+      let res;
+      if (isNew) {
+        res = await supabase.from("pacientes").insert([payload]);
+      } else {
+        const { id, ...rest } = payload;
+        res = await supabase.from("pacientes").update(rest).eq("id", id);
+      }
+      
+      if (res.error) {
+        console.error("Error Supabase:", res.error);
+        alert("No se pudo guardar: " + res.error.message);
+      } else {
+        refresh();
+        onClose();
+      }
+    } catch (err) {
+      alert("Error inesperado: " + err.message);
     }
-    refresh();
-    onClose();
   };
 
   const remove = async () => {
