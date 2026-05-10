@@ -68,30 +68,23 @@ export default async function handler(req, res) {
 
     const { cleanText, actions } = parseSpecialTags(claude.text);
 
-    // ───── 5. Persistir en conversaciones ─────
+    // ───── 5. Persistir en conversaciones (opcional, no bloquea respuesta) ─────
     let conversacionId = null;
     try {
       const lastUserMsg = messages[messages.length - 1];
       if (lastUserMsg?.role === "user") {
         await supabase.rpc("append_message_to_conversation", {
-          p_phone: phone,
-          p_canal: canal,
-          p_role: "user",
-          p_content: lastUserMsg.content,
-          p_meta: { sessionId },
+          p_phone: phone, p_canal: canal, p_role: "user",
+          p_content: lastUserMsg.content, p_meta: { sessionId },
         });
       }
-
       const { data: cid } = await supabase.rpc("append_message_to_conversation", {
-        p_phone: phone,
-        p_canal: canal,
-        p_role: "assistant",
-        p_content: cleanText,
-        p_meta: { sessionId, actions, model: MODELS.CHAT },
+        p_phone: phone, p_canal: canal, p_role: "assistant",
+        p_content: cleanText, p_meta: { sessionId, actions, model: MODELS.CHAT },
       });
       conversacionId = cid;
     } catch (err) {
-      console.warn("[chat] No se pudo persistir conversación:", err.message);
+      console.warn("[chat] No se pudo persistir conversación (RPC opcional):", err.message);
     }
 
     // ───── 6. Ejecutar acciones especiales ─────
@@ -101,15 +94,14 @@ export default async function handler(req, res) {
       );
     }
 
-    // ───── 7. Log de costos ─────
-    logApiCall(supabase, {
-      opticaId: opticaCfg?.id || paciente?.optica_id,
-      conversacionId,
-      model: MODELS.CHAT,
-      usage: claude.usage,
-      costUsd: claude.costUsd,
-      latencyMs: claude.latencyMs,
-    });
+    // ───── 7. Log de costos (best-effort, no bloquea) ─────
+    try {
+      logApiCall(supabase, {
+        opticaId: opticaCfg?.id || paciente?.optica_id,
+        conversacionId, model: MODELS.CHAT,
+        usage: claude.usage, costUsd: claude.costUsd, latencyMs: claude.latencyMs,
+      });
+    } catch (e) { console.warn("[chat] logApiCall falló:", e.message); }
 
     return res.status(200).json({
       content: [{ type: "text", text: cleanText }],
@@ -119,12 +111,16 @@ export default async function handler(req, res) {
     });
 
   } catch (err) {
-    console.error("[chat] Error:", err.message, err.stack);
+    console.error("[chat] Error completo:", err);
+    const isTestMode = req.body?.canal === "dashboard-test";
     return res.status(500).json({
       error: err.message || "Error interno del chat",
+      stack: isTestMode ? err.stack?.split("\n").slice(0, 5) : undefined,
       content: [{
         type: "text",
-        text: "Disculpa, tuve un problema técnico. Por favor inténtalo en un momento."
+        text: isTestMode
+          ? `⚠️ Error técnico interno: ${err.message || "desconocido"}.\n\nVerifica:\n1. ANTHROPIC_API_KEY configurada en Vercel\n2. Tabla 'opticas' tiene fila con slug 'glowvision'\n3. Logs de Vercel para más detalle`
+          : "Disculpa, tuve un problema técnico. Por favor inténtalo en un momento."
       }],
     });
   }
