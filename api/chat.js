@@ -102,22 +102,30 @@ export default async function handler(req, res) {
     if (paciente?.id) {
       for (const ar of actionResults) {
         if (ar.type === "booked" && ar.cita) {
-          const fechaFmt = new Date(ar.cita.fecha + "T" + (ar.cita.hora || "12:00")).toLocaleDateString("es-CL", {
-            weekday: "long", day: "numeric", month: "long",
-          });
-          const calLink = buildGoogleCalLink({
-            title: `${opticaCfg?.nombre || "Aukén"} — ${ar.cita.servicio}`,
-            details: `Paciente: ${paciente.nombre}\nTeléfono: ${paciente.telefono || "—"}\nServicio: ${ar.cita.servicio}\nAgendada por Aukén IA`,
-            location: `${opticaCfg?.direccion || ""}${opticaCfg?.ciudad ? ", " + opticaCfg.ciudad : ""}`,
-            startISO: `${ar.cita.fecha}T${ar.cita.hora || "12:00"}:00`,
-            durationMin: 30,
-          });
-          await supabase.from("mensajes_chat").insert([{
-            paciente_id: paciente.id,
-            remitente: "bot",
-            contenido: `✅ Cita agendada: ${fechaFmt} a las ${ar.cita.hora}\n📅 Agregar a Google Calendar: ${calLink}`,
-            metadata: { type: "system_booking_confirmation", cita_id: ar.cita.id, calendar_url: calLink },
-          }]);
+          try {
+            const horaSafe = ar.cita.hora || "12:00";
+            const dateObj = new Date(`${ar.cita.fecha}T${horaSafe}:00`);
+            const fechaFmt = isNaN(dateObj.getTime())
+              ? `${ar.cita.fecha} a las ${horaSafe}`
+              : dateObj.toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" });
+
+            const calLink = buildGoogleCalLink({
+              title: `${opticaCfg?.nombre || "Aukén"} — ${ar.cita.servicio}`,
+              details: `Paciente: ${paciente.nombre}\nTeléfono: ${paciente.telefono || "—"}\nServicio: ${ar.cita.servicio}\nAgendada por Aukén IA`,
+              location: `${opticaCfg?.direccion || ""}${opticaCfg?.ciudad ? ", " + opticaCfg.ciudad : ""}`,
+              startISO: `${ar.cita.fecha}T${horaSafe}:00`,
+              durationMin: 30,
+            });
+
+            await supabase.from("mensajes_chat").insert([{
+              paciente_id: paciente.id,
+              remitente: "bot",
+              contenido: `✅ Cita agendada: ${fechaFmt} a las ${horaSafe}\n📅 Agregar a Google Calendar: ${calLink}`,
+              metadata: { type: "system_booking_confirmation", cita_id: ar.cita.id, calendar_url: calLink },
+            }]);
+          } catch (e) {
+            console.warn("[chat] No se pudo crear mensaje confirmatorio:", e.message);
+          }
         }
       }
     }
@@ -176,6 +184,15 @@ async function executeWebAction(supabase, action, phone, paciente, opticaCfg) {
   }
 
   if (action.type === "book" && paciente) {
+    // Normalizar fecha — Claude a veces emite "sábado", "viernes", "mañana"
+    const fechaISO = normalizeDate(action.fecha);
+    const horaISO  = normalizeHora(action.hora);
+
+    if (!fechaISO) {
+      console.warn("[chat] Fecha no parseable, ignorando book:", action.fecha);
+      return null;
+    }
+
     const { data: cita, error } = await supabase.from("citas").insert({
       paciente_id: paciente.id,
       optica_id: opticaCfg?.id || paciente.optica_id,
@@ -183,8 +200,8 @@ async function executeWebAction(supabase, action, phone, paciente, opticaCfg) {
       rut: paciente.rut,
       telefono: paciente.telefono,
       servicio: action.servicio,
-      fecha: action.fecha,
-      hora: action.hora,
+      fecha: fechaISO,
+      hora: horaISO,
       origen: "bot-ia",
       canal: "chat",
       estado: "pendiente_confirmacion",
@@ -193,6 +210,86 @@ async function executeWebAction(supabase, action, phone, paciente, opticaCfg) {
     return { type: "booked", cita };
   }
   return null;
+}
+
+/**
+ * Normaliza fechas en lenguaje natural a ISO YYYY-MM-DD.
+ * Acepta: "2026-05-15" (passthrough), "sábado", "viernes", "mañana", "hoy",
+ *         "lunes", "martes", etc. Calcula el PRÓXIMO día desde hoy.
+ */
+function normalizeDate(input) {
+  if (!input) return null;
+  const text = String(input).trim().toLowerCase();
+
+  // Ya viene en formato ISO
+  if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
+
+  // DD/MM/YYYY o DD-MM-YYYY
+  const m = text.match(/^(\d{1,2})[\/\-](\d{1,2})[\/\-](\d{4})$/);
+  if (m) {
+    const [_, d, mo, y] = m;
+    return `${y}-${mo.padStart(2,"0")}-${d.padStart(2,"0")}`;
+  }
+
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+
+  if (text === "hoy") return toISO(today);
+  if (text === "mañana" || text === "manana") {
+    const t = new Date(today); t.setDate(t.getDate() + 1); return toISO(t);
+  }
+  if (text === "pasado" || text === "pasado mañana" || text === "pasado manana") {
+    const t = new Date(today); t.setDate(t.getDate() + 2); return toISO(t);
+  }
+
+  // Días de la semana
+  const dias = {
+    "domingo": 0, "lunes": 1, "martes": 2, "miercoles": 3, "miércoles": 3,
+    "jueves": 4, "viernes": 5, "sabado": 6, "sábado": 6,
+  };
+  const cleaned = text.replace(/^(el |este |próximo |proximo |próx )/, "").trim();
+  if (dias.hasOwnProperty(cleaned)) {
+    const target = dias[cleaned];
+    const cur = today.getDay();
+    let diff = target - cur;
+    if (diff <= 0) diff += 7; // siempre futuro
+    const t = new Date(today); t.setDate(t.getDate() + diff);
+    return toISO(t);
+  }
+
+  // Intentar Date() como último recurso
+  const d = new Date(text);
+  if (!isNaN(d.getTime())) return toISO(d);
+
+  return null;
+}
+
+function normalizeHora(input) {
+  if (!input) return "12:00";
+  const text = String(input).trim().toLowerCase();
+  // 17:00, 17:30, 09:00
+  const m = text.match(/^(\d{1,2}):?(\d{2})?$/);
+  if (m) {
+    const h = parseInt(m[1], 10);
+    const min = m[2] || "00";
+    return `${String(h).padStart(2,"0")}:${min}`;
+  }
+  // "5pm", "10am"
+  const m2 = text.match(/^(\d{1,2})\s*(am|pm)$/);
+  if (m2) {
+    let h = parseInt(m2[1], 10);
+    if (m2[2] === "pm" && h < 12) h += 12;
+    if (m2[2] === "am" && h === 12) h = 0;
+    return `${String(h).padStart(2,"0")}:00`;
+  }
+  return "12:00";
+}
+
+function toISO(d) {
+  const y = d.getFullYear();
+  const m = String(d.getMonth() + 1).padStart(2, "0");
+  const day = String(d.getDate()).padStart(2, "0");
+  return `${y}-${m}-${day}`;
 }
 
 /**

@@ -904,10 +904,20 @@ export default function AukenOpticaDashboard() {
   // ✅ useEffect DESPUÉS de useState (sin TDZ)
   useEffect(() => { refresh(); }, [refresh]);
 
-  // Auto-refresh cada 10 segundos
+  // Auto-refresh cada 10 segundos como fallback
   useEffect(() => {
     const interval = setInterval(refresh, 10000);
     return () => clearInterval(interval);
+  }, [refresh]);
+
+  // Real-time multi-dispositivo: cualquier cambio en pacientes/citas → refresh
+  useEffect(() => {
+    const sub = supabase.channel("dashboard_live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "pacientes" }, () => refresh())
+      .on("postgres_changes", { event: "*", schema: "public", table: "citas" },     () => refresh())
+      .on("postgres_changes", { event: "*", schema: "public", table: "opticas" },   () => refresh())
+      .subscribe();
+    return () => supabase.removeChannel(sub);
   }, [refresh]);
 
   // Title dinámico (también después de useState)

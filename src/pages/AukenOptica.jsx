@@ -2,6 +2,17 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 
+// Hook responsive — detecta tamaño de pantalla
+function useViewport() {
+  const [w, setW] = useState(typeof window !== "undefined" ? window.innerWidth : 1024);
+  useEffect(() => {
+    const onResize = () => setW(window.innerWidth);
+    window.addEventListener("resize", onResize);
+    return () => window.removeEventListener("resize", onResize);
+  }, []);
+  return { w, isMobile: w < 768, isTablet: w >= 768 && w < 1100 };
+}
+
 const C = {
   bg:        "#05060A",
   surface:   "#0E1018",
@@ -223,6 +234,8 @@ export default function AukenOptica() {
   const navigate = useNavigate();
   const bottomRef  = useRef(null);
   const inputRef   = useRef(null);
+  const { isMobile, isTablet } = useViewport();
+  const [showSidebar, setShowSidebar] = useState(false); // móvil: drawer cerrado por defecto
 
   const [activeP,   setActiveP]   = useState(null);
   const [patients,  setPatients]  = useState([]);
@@ -288,9 +301,10 @@ export default function AukenOptica() {
   useEffect(() => { if (activeP) loadChat(activeP.id); }, [activeP, loadChat]);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
-  // ── Real-time ────────────────────────────────────────────────────────────────
+  // ── Real-time multi-dispositivo: mensajes + pacientes + citas ───────────────
   useEffect(() => {
-    const sub = supabase.channel("chat_live")
+    const sub = supabase.channel("auken_live")
+      // Mensajes nuevos
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "mensajes_chat" }, (payload) => {
         const m = payload.new;
         setLastMsgs(prev => ({ ...prev, [m.paciente_id]: m }));
@@ -306,9 +320,18 @@ export default function AukenOptica() {
           });
           setTimeout(() => setNewMsgAlert(null), 4000);
         }
-      }).subscribe();
+      })
+      // Pacientes (INSERT/UPDATE/DELETE) — sincroniza entre notebooks
+      .on("postgres_changes", { event: "*", schema: "public", table: "pacientes" }, () => {
+        refresh();
+      })
+      // Citas (cuando bot IA agenda automáticamente desde otro dispositivo)
+      .on("postgres_changes", { event: "*", schema: "public", table: "citas" }, () => {
+        // El monitor no muestra citas, pero el dashboard sí; el evento queda registrado.
+      })
+      .subscribe();
     return () => supabase.removeChannel(sub);
-  }, [activeP]);
+  }, [activeP, refresh]);
 
   // ── Enviar ───────────────────────────────────────────────────────────────────
   const handleSend = async () => {
@@ -421,6 +444,7 @@ export default function AukenOptica() {
         ::-webkit-scrollbar{width:3px}
         ::-webkit-scrollbar-thumb{background:${C.border};border-radius:4px}
         @keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+        @keyframes slideInRight{from{transform:translateX(100%)}to{transform:translateX(0)}}
         @keyframes blink{0%,100%{opacity:1}50%{opacity:0.2}}
         @keyframes ping{0%{transform:scale(1);opacity:0.6}100%{transform:scale(2.5);opacity:0}}
         @keyframes slideIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
@@ -450,6 +474,12 @@ export default function AukenOptica() {
         padding: "0 20px", flexShrink: 0, zIndex: 50,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          {isMobile && (
+            <button onClick={() => setShowSidebar(v => !v)} aria-label="Abrir lista"
+              style={{ background: "transparent", border: "none", color: C.ink, fontSize: 20, cursor: "pointer", padding: "4px 8px" }}>
+              ☰
+            </button>
+          )}
           <div style={{ width: 26, height: 26, background: `linear-gradient(135deg, ${C.primary}, ${C.neon})`, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}>👁️</div>
           <span style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 14 }}>Monitor</span>
           <span style={{ color: C.inkFaint }}>·</span>
@@ -476,10 +506,33 @@ export default function AukenOptica() {
       </nav>
 
       {/* ── BODY ────────────────────────────────────────────────────────── */}
-      <div style={{ flex: 1, display: "flex", overflow: "hidden" }}>
+      <div style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative" }}>
+
+        {/* Overlay para cerrar drawer en móvil */}
+        {isMobile && showSidebar && (
+          <div onClick={() => setShowSidebar(false)} style={{
+            position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)",
+            zIndex: 30, backdropFilter: "blur(4px)",
+          }} />
+        )}
 
         {/* ── SIDEBAR ─────────────────────────────────────────────────── */}
-        <aside style={{ width: 290, borderRight: `1px solid ${C.border}`, background: C.surface, display: "flex", flexDirection: "column", flexShrink: 0 }}>
+        <aside style={{
+          width: isMobile ? 280 : 290,
+          borderRight: `1px solid ${C.border}`,
+          background: C.surface,
+          display: "flex",
+          flexDirection: "column",
+          flexShrink: 0,
+          ...(isMobile ? {
+            position: "absolute",
+            top: 0, bottom: 0, left: 0,
+            zIndex: 40,
+            transform: showSidebar ? "translateX(0)" : "translateX(-100%)",
+            transition: "transform 0.25s ease",
+            boxShadow: showSidebar ? "8px 0 32px rgba(0,0,0,.6)" : "none",
+          } : {}),
+        }}>
           {/* Buscador */}
           <div style={{ padding: "10px 10px 6px" }}>
             <div style={{ position: "relative" }}>
@@ -515,7 +568,7 @@ export default function AukenOptica() {
             {filtered.map(p => (
               <PatientRow key={p.id} p={p} active={activeP?.id === p.id}
                 lastMsg={lastMsgs[p.id]} unread={unreadMap[p.id] || 0}
-                onClick={() => { setActiveP(p); setShowPanel(true); }}
+                onClick={() => { setActiveP(p); setShowPanel(!isMobile); setShowSidebar(false); }}
               />
             ))}
           </div>
@@ -711,12 +764,23 @@ export default function AukenOptica() {
         </section>
 
         {/* ── FICHA ────────────────────────────────────────────────────── */}
+        {activeP && showPanel && isMobile && (
+          <div onClick={() => setShowPanel(false)} style={{
+            position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)",
+            zIndex: 30, backdropFilter: "blur(4px)",
+          }} />
+        )}
         {activeP && showPanel && (
-          <PatientPanel
-            p={activeP}
-            onClose={() => setShowPanel(false)}
-            onGoToDashboard={() => navigate("/optica/dashboard")}
-          />
+          <div style={isMobile ? {
+            position: "absolute", top: 0, bottom: 0, right: 0, zIndex: 40,
+            boxShadow: "-8px 0 32px rgba(0,0,0,.6)", animation: "slideInRight 0.25s ease",
+          } : {}}>
+            <PatientPanel
+              p={activeP}
+              onClose={() => setShowPanel(false)}
+              onGoToDashboard={() => navigate("/optica/dashboard")}
+            />
+          </div>
         )}
       </div>
     </div>
