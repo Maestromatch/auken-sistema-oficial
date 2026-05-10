@@ -88,10 +88,38 @@ export default async function handler(req, res) {
     }
 
     // ───── 6. Ejecutar acciones especiales ─────
+    const actionResults = [];
     for (const action of actions) {
-      await executeWebAction(supabase, action, phone, paciente, opticaCfg).catch(err =>
-        console.warn(`[chat] Acción ${action.type} falló:`, err.message)
-      );
+      try {
+        const result = await executeWebAction(supabase, action, phone, paciente, opticaCfg);
+        if (result) actionResults.push(result);
+      } catch (err) {
+        console.warn(`[chat] Acción ${action.type} falló:`, err.message);
+      }
+    }
+
+    // Insertar mensaje confirmatorio del sistema cuando se agenda
+    if (paciente?.id) {
+      for (const ar of actionResults) {
+        if (ar.type === "booked" && ar.cita) {
+          const fechaFmt = new Date(ar.cita.fecha + "T" + (ar.cita.hora || "12:00")).toLocaleDateString("es-CL", {
+            weekday: "long", day: "numeric", month: "long",
+          });
+          const calLink = buildGoogleCalLink({
+            title: `${opticaCfg?.nombre || "Aukén"} — ${ar.cita.servicio}`,
+            details: `Paciente: ${paciente.nombre}\nTeléfono: ${paciente.telefono || "—"}\nServicio: ${ar.cita.servicio}\nAgendada por Aukén IA`,
+            location: `${opticaCfg?.direccion || ""}${opticaCfg?.ciudad ? ", " + opticaCfg.ciudad : ""}`,
+            startISO: `${ar.cita.fecha}T${ar.cita.hora || "12:00"}:00`,
+            durationMin: 30,
+          });
+          await supabase.from("mensajes_chat").insert([{
+            paciente_id: paciente.id,
+            remitente: "bot",
+            contenido: `✅ Cita agendada: ${fechaFmt} a las ${ar.cita.hora}\n📅 Agregar a Google Calendar: ${calLink}`,
+            metadata: { type: "system_booking_confirmation", cita_id: ar.cita.id, calendar_url: calLink },
+          }]);
+        }
+      }
     }
 
     // ───── 7. Log de costos (best-effort, no bloquea) ─────
@@ -148,7 +176,7 @@ async function executeWebAction(supabase, action, phone, paciente, opticaCfg) {
   }
 
   if (action.type === "book" && paciente) {
-    await supabase.from("citas").insert({
+    const { data: cita, error } = await supabase.from("citas").insert({
       paciente_id: paciente.id,
       optica_id: opticaCfg?.id || paciente.optica_id,
       nombre: paciente.nombre,
@@ -157,9 +185,30 @@ async function executeWebAction(supabase, action, phone, paciente, opticaCfg) {
       servicio: action.servicio,
       fecha: action.fecha,
       hora: action.hora,
-      origen: "web-bot",
-      canal: "web",
+      origen: "bot-ia",
+      canal: "chat",
       estado: "pendiente_confirmacion",
-    });
+    }).select().maybeSingle();
+    if (error) throw error;
+    return { type: "booked", cita };
   }
+  return null;
+}
+
+/**
+ * Genera un link "Add to Google Calendar" sin requerir OAuth.
+ * El usuario hace click y se abre Google Calendar con los datos pre-llenados.
+ */
+function buildGoogleCalLink({ title, details, location, startISO, durationMin = 30 }) {
+  const start = new Date(startISO);
+  const end = new Date(start.getTime() + durationMin * 60 * 1000);
+  const fmt = (d) => d.toISOString().replace(/[-:]|\.\d{3}/g, "");
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: title,
+    dates: `${fmt(start)}/${fmt(end)}`,
+    details: details || "",
+    location: location || "",
+  });
+  return `https://www.google.com/calendar/render?${params.toString()}`;
 }
