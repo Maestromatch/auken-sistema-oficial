@@ -206,16 +206,40 @@ function TabMetricas({ optica, stats }) {
 // TAB: PACIENTES
 // ─────────────────────────────────────────────────────────────
 function TabPacientes({ optica, pacientes, refresh, handleSendWhatsApp, onEdit, onCreate }) {
+  const [search, setSearch] = useState("");
+  const filtered = search.trim()
+    ? pacientes.filter(p => {
+        const q = search.toLowerCase();
+        return (p.nombre?.toLowerCase().includes(q)) ||
+               (p.rut?.toLowerCase().includes(q)) ||
+               (p.telefono?.includes(q));
+      })
+    : pacientes;
+
   return (
     <Card style={{ padding: 0 }}>
-      <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+      <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
         <div>
           <div style={{ fontSize: 16, fontWeight: 600, color: C.text }}>Base de Datos de Pacientes</div>
-          <div style={{ fontSize: 12, color: C.textDim, marginTop: 2 }}>{pacientes.length} registrados</div>
+          <div style={{ fontSize: 12, color: C.textDim, marginTop: 2 }}>
+            {filtered.length !== pacientes.length ? `${filtered.length} de ${pacientes.length} mostrados` : `${pacientes.length} registrados`}
+          </div>
+        </div>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flex: 1, maxWidth: 340 }}>
+          <input
+            value={search}
+            onChange={e => setSearch(e.target.value)}
+            placeholder="Buscar nombre, RUT o teléfono..."
+            style={{ flex: 1, background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "8px 14px", borderRadius: 8, outline: "none", fontSize: 13 }}
+          />
+          {search && (
+            <button onClick={() => setSearch("")}
+              style={{ background: "transparent", border: "none", color: C.textMuted, cursor: "pointer", fontSize: 20, lineHeight: 1 }}>×</button>
+          )}
         </div>
         <button onClick={onCreate} style={{
           background: C.primary, color: "#000", border: "none", borderRadius: 6,
-          padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer",
+          padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
         }}>+ Nuevo Paciente</button>
       </div>
 
@@ -229,12 +253,12 @@ function TabPacientes({ optica, pacientes, refresh, handleSendWhatsApp, onEdit, 
             </tr>
           </thead>
           <tbody>
-            {pacientes.length === 0 && (
+            {filtered.length === 0 && (
               <tr><td colSpan="5" style={{ padding: "40px", textAlign: "center", color: C.textDim, fontSize: 13 }}>
-                Aún no hay pacientes. Agrega el primero arriba o captúralos automáticamente desde WhatsApp.
+                {search ? `Sin resultados para "${search}"` : "Aún no hay pacientes. Agrega el primero arriba o captúralos automáticamente desde WhatsApp."}
               </td></tr>
             )}
-            {pacientes.map(p => {
+            {filtered.map(p => {
               const dias = p.fecha_ultima_visita
                 ? Math.floor((Date.now() - new Date(p.fecha_ultima_visita).getTime()) / (1000 * 60 * 60 * 24))
                 : null;
@@ -285,71 +309,214 @@ function TabPacientes({ optica, pacientes, refresh, handleSendWhatsApp, onEdit, 
 }
 
 // ─────────────────────────────────────────────────────────────
+// MODAL: NUEVA CITA MANUAL
+// ─────────────────────────────────────────────────────────────
+function CitaModal({ opticaId, pacientes, onClose, refresh }) {
+  const today = new Date().toISOString().split("T")[0];
+  const [form, setForm] = useState({
+    nombre: "", telefono: "", servicio: "",
+    fecha: today, hora: "10:00", notas: "",
+    estado: "confirmada",
+  });
+  const [saving, setSaving] = useState(false);
+  const [selectedPacienteId, setSelectedPacienteId] = useState("");
+
+  const handlePacienteSelect = (e) => {
+    const id = e.target.value;
+    setSelectedPacienteId(id);
+    if (id) {
+      const p = pacientes.find(p => String(p.id) === id);
+      if (p) setForm(prev => ({ ...prev, nombre: p.nombre || "", telefono: p.telefono || "" }));
+    }
+  };
+
+  const save = async () => {
+    if (!form.nombre) { alert("El nombre del paciente es obligatorio"); return; }
+    if (!form.fecha) { alert("La fecha es obligatoria"); return; }
+    setSaving(true);
+    const { error } = await supabase.from("citas").insert([{
+      optica_id: opticaId,
+      paciente_id: selectedPacienteId || null,
+      nombre: form.nombre,
+      telefono: form.telefono,
+      servicio: form.servicio,
+      fecha: form.fecha,
+      hora: form.hora,
+      notas: form.notas,
+      estado: form.estado,
+      origen: "manual",
+    }]);
+    setSaving(false);
+    if (error) { alert("Error al guardar: " + error.message); }
+    else { refresh(); onClose(); }
+  };
+
+  return (
+    <div style={{
+      position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)",
+      backdropFilter: "blur(6px)", display: "flex", alignItems: "center",
+      justifyContent: "center", zIndex: 100, padding: 20,
+    }} onClick={onClose}>
+      <div onClick={e => e.stopPropagation()} style={{
+        background: C.surface, border: `1px solid ${C.border}`,
+        borderRadius: 16, width: 480, maxHeight: "90vh", overflow: "auto",
+      }}>
+        <div style={{ padding: 24, borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h3 style={{ fontSize: 18, fontWeight: 700, color: C.text }}>📅 Nueva Cita Manual</h3>
+          <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.textDim, fontSize: 22, cursor: "pointer" }}>×</button>
+        </div>
+
+        <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 14 }}>
+          {pacientes.length > 0 && (
+            <div>
+              <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: C.textDim, textTransform: "uppercase", marginBottom: 6 }}>
+                Paciente existente (opcional)
+              </label>
+              <select value={selectedPacienteId} onChange={handlePacienteSelect}
+                style={{ width: "100%", background: C.bg, border: `1px solid ${C.border}`, color: selectedPacienteId ? C.text : C.textMuted, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13 }}>
+                <option value="">— O ingresar nombre manualmente abajo —</option>
+                {pacientes.map(p => (
+                  <option key={p.id} value={String(p.id)}>{p.nombre}{p.rut ? ` · ${p.rut}` : ""}</option>
+                ))}
+              </select>
+            </div>
+          )}
+
+          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 10 }}>
+            <input placeholder="Nombre del paciente *" value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })}
+              style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13 }} />
+            <input placeholder="+569..." value={form.telefono} onChange={e => setForm({ ...form, telefono: e.target.value })}
+              style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13 }} />
+          </div>
+
+          <input placeholder="Servicio (ej: Examen visual, Lentes de contacto...)" value={form.servicio} onChange={e => setForm({ ...form, servicio: e.target.value })}
+            style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13 }} />
+
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+            <div>
+              <div style={{ fontSize: 10, color: C.textDim, marginBottom: 4, textTransform: "uppercase", fontWeight: 700 }}>Fecha *</div>
+              <input type="date" value={form.fecha} onChange={e => setForm({ ...form, fecha: e.target.value })}
+                style={{ width: "100%", background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13 }} />
+            </div>
+            <div>
+              <div style={{ fontSize: 10, color: C.textDim, marginBottom: 4, textTransform: "uppercase", fontWeight: 700 }}>Hora</div>
+              <input type="time" value={form.hora} onChange={e => setForm({ ...form, hora: e.target.value })}
+                style={{ width: "100%", background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13 }} />
+            </div>
+          </div>
+
+          <div>
+            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: C.textDim, textTransform: "uppercase", marginBottom: 6 }}>Estado</label>
+            <select value={form.estado} onChange={e => setForm({ ...form, estado: e.target.value })}
+              style={{ width: "100%", background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13 }}>
+              <option value="confirmada">Confirmada</option>
+              <option value="pendiente_confirmacion">Pendiente confirmación</option>
+            </select>
+          </div>
+
+          <textarea placeholder="Notas adicionales" rows={2} value={form.notas} onChange={e => setForm({ ...form, notas: e.target.value })}
+            style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "inherit", resize: "none" }} />
+        </div>
+
+        <div style={{ padding: 24, borderTop: `1px solid ${C.border}`, display: "flex", justifyContent: "flex-end", gap: 10 }}>
+          <button onClick={onClose}
+            style={{ background: "transparent", color: C.text, border: `1px solid ${C.border}`, padding: "10px 18px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>
+            Cancelar
+          </button>
+          <button onClick={save} disabled={saving}
+            style={{ background: C.primary, color: "#000", border: "none", padding: "10px 22px", borderRadius: 8, cursor: saving ? "default" : "pointer", fontSize: 13, fontWeight: 700, opacity: saving ? 0.6 : 1 }}>
+            {saving ? "Guardando..." : "📅 Agendar Cita"}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────
 // TAB: CITAS
 // ─────────────────────────────────────────────────────────────
-function TabCitas({ citas, refresh }) {
+function TabCitas({ citas, refresh, optica, pacientes }) {
+  const [showModal, setShowModal] = useState(false);
+
   const updateCita = async (id, estado) => {
     await supabase.from("citas").update({ estado }).eq("id", id);
     refresh();
   };
 
   return (
-    <Card style={{ padding: 0 }}>
-      <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.border}` }}>
-        <div style={{ fontSize: 16, fontWeight: 600, color: C.text }}>Agenda de Citas</div>
-        <div style={{ fontSize: 12, color: C.textDim, marginTop: 2 }}>
-          {citas.filter(c => c.estado === "pendiente_confirmacion").length} pendientes de confirmar
+    <>
+      <Card style={{ padding: 0 }}>
+        <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <div>
+            <div style={{ fontSize: 16, fontWeight: 600, color: C.text }}>Agenda de Citas</div>
+            <div style={{ fontSize: 12, color: C.textDim, marginTop: 2 }}>
+              {citas.filter(c => c.estado === "pendiente_confirmacion").length} pendientes de confirmar
+            </div>
+          </div>
+          <button onClick={() => setShowModal(true)} style={{
+            background: C.primary, color: "#000", border: "none", borderRadius: 6,
+            padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer",
+          }}>+ Nueva Cita</button>
         </div>
-      </div>
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr style={{ background: `${C.surfaceL}80` }}>
-              {["Paciente", "Servicio", "Fecha y hora", "Origen", "Estado", "Acciones"].map(h => (
-                <th key={h} style={{ padding: "12px 16px", fontSize: 11, color: C.textMuted, fontWeight: 600, textTransform: "uppercase", textAlign: "left" }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {citas.length === 0 && (
-              <tr><td colSpan="6" style={{ padding: 32, textAlign: "center", color: C.textDim, fontSize: 13 }}>
-                No hay citas agendadas.
-              </td></tr>
-            )}
-            {citas.map(c => {
-              const estadoColor = c.estado === "confirmada" ? C.green
-                : c.estado === "cancelada" ? C.red
-                : c.estado === "completada" ? C.blue
-                : C.amber;
-              return (
-                <tr key={c.id} style={{ borderBottom: `1px solid ${C.border}` }}>
-                  <td style={{ padding: "12px 16px" }}>
-                    <div style={{ fontWeight: 600, color: C.text, fontSize: 13 }}>{c.nombre || `Paciente #${c.paciente_id}`}</div>
-                    {c.telefono && <div style={{ fontSize: 11, color: C.textDim }}>{c.telefono}</div>}
-                  </td>
-                  <td style={{ padding: "12px 16px", fontSize: 13, color: C.text }}>{c.servicio || "—"}</td>
-                  <td style={{ padding: "12px 16px", fontSize: 13, color: C.text }}>{c.fecha} {c.hora && `· ${c.hora}`}</td>
-                  <td style={{ padding: "12px 16px" }}><Pill label={c.origen || "manual"} color={C.blue} /></td>
-                  <td style={{ padding: "12px 16px" }}><Pill label={c.estado} color={estadoColor} /></td>
-                  <td style={{ padding: "12px 16px", display: "flex", gap: 6 }}>
-                    {c.estado === "pendiente_confirmacion" && (
-                      <button onClick={() => updateCita(c.id, "confirmada")}
-                        style={{ background: `${C.green}20`, color: C.green, border: `1px solid ${C.green}40`, padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11, fontWeight: 600 }}>
-                        ✓ Confirmar
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ background: `${C.surfaceL}80` }}>
+                {["Paciente", "Servicio", "Fecha y hora", "Origen", "Estado", "Acciones"].map(h => (
+                  <th key={h} style={{ padding: "12px 16px", fontSize: 11, color: C.textMuted, fontWeight: 600, textTransform: "uppercase", textAlign: "left" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {citas.length === 0 && (
+                <tr><td colSpan="6" style={{ padding: 32, textAlign: "center", color: C.textDim, fontSize: 13 }}>
+                  No hay citas agendadas. Usa "+ Nueva Cita" para agregar una manualmente.
+                </td></tr>
+              )}
+              {citas.map(c => {
+                const estadoColor = c.estado === "confirmada" ? C.green
+                  : c.estado === "cancelada" ? C.red
+                  : c.estado === "completada" ? C.blue
+                  : C.amber;
+                return (
+                  <tr key={c.id} style={{ borderBottom: `1px solid ${C.border}` }}>
+                    <td style={{ padding: "12px 16px" }}>
+                      <div style={{ fontWeight: 600, color: C.text, fontSize: 13 }}>{c.nombre || `Paciente #${c.paciente_id}`}</div>
+                      {c.telefono && <div style={{ fontSize: 11, color: C.textDim }}>{c.telefono}</div>}
+                    </td>
+                    <td style={{ padding: "12px 16px", fontSize: 13, color: C.text }}>{c.servicio || "—"}</td>
+                    <td style={{ padding: "12px 16px", fontSize: 13, color: C.text }}>{c.fecha} {c.hora && `· ${c.hora}`}</td>
+                    <td style={{ padding: "12px 16px" }}><Pill label={c.origen || "manual"} color={C.blue} /></td>
+                    <td style={{ padding: "12px 16px" }}><Pill label={c.estado} color={estadoColor} /></td>
+                    <td style={{ padding: "12px 16px", display: "flex", gap: 6 }}>
+                      {c.estado === "pendiente_confirmacion" && (
+                        <button onClick={() => updateCita(c.id, "confirmada")}
+                          style={{ background: `${C.green}20`, color: C.green, border: `1px solid ${C.green}40`, padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11, fontWeight: 600 }}>
+                          ✓ Confirmar
+                        </button>
+                      )}
+                      <button onClick={() => updateCita(c.id, "cancelada")}
+                        style={{ background: `${C.red}20`, color: C.red, border: `1px solid ${C.red}40`, padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11, fontWeight: 600 }}>
+                        Cancelar
                       </button>
-                    )}
-                    <button onClick={() => updateCita(c.id, "cancelada")}
-                      style={{ background: `${C.red}20`, color: C.red, border: `1px solid ${C.red}40`, padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11, fontWeight: 600 }}>
-                      Cancelar
-                    </button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
-    </Card>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      </Card>
+      {showModal && (
+        <CitaModal
+          opticaId={optica?.id}
+          pacientes={pacientes || []}
+          onClose={() => setShowModal(false)}
+          refresh={refresh}
+        />
+      )}
+    </>
   );
 }
 
@@ -857,7 +1024,7 @@ export default function AukenOpticaDashboard() {
             onCreate={() => { setEditingPatient(null); setShowPatientModal(true); }}
           />
         )}
-        {tab === "citas" && <TabCitas citas={citas} refresh={refresh} />}
+        {tab === "citas" && <TabCitas citas={citas} refresh={refresh} optica={optica} pacientes={pacientes} />}
         {tab === "config" && <TabConfiguracion optica={optica} refresh={refresh} />}
       </div>
 
