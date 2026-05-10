@@ -1,16 +1,18 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 
 export default function AukenLogin() {
   const [password, setPassword] = useState("");
   const [error, setError] = useState(false);
   const navigate = useNavigate();
+  const location = useLocation();
+  const from = location.state?.from || "/optica/dashboard";
 
   const handleLogin = (e) => {
     e.preventDefault();
     if (password === "glow2026") {
       localStorage.setItem("auken_auth", "true");
-      navigate("/optica/dashboard");
+      navigate(from, { replace: true });
     } else {
       setError(true);
       setTimeout(() => setError(false), 2000);

@@ -240,6 +240,8 @@ export default function AukenOptica() {
   const [filter,     setFilter]     = useState("all");
   const [showQuick,  setShowQuick]  = useState(false);
   const [newMsgAlert, setNewMsgAlert] = useState(null); // nombre del paciente con msg nuevo
+  const [testMode,   setTestMode]   = useState(false);  // simula ser cliente, IA responde
+  const [iaThinking, setIaThinking] = useState(false);
 
   // ── Carga pacientes ──────────────────────────────────────────────────────────
   const refresh = useCallback(async () => {
@@ -311,12 +313,63 @@ export default function AukenOptica() {
   // ── Enviar ───────────────────────────────────────────────────────────────────
   const handleSend = async () => {
     if (!inputText.trim() || !activeP || sending) return;
+    const text = inputText.trim();
     setSending(true);
-    const { error } = await supabase.from("mensajes_chat").insert([{
-      paciente_id: activeP.id, remitente: "admin", contenido: inputText.trim(),
-    }]);
-    setSending(false);
-    if (!error) { setInputText(""); loadChat(activeP.id); }
+
+    if (testMode) {
+      // 🧪 Modo prueba: el operador simula al cliente → Claude responde
+      const { error: e1 } = await supabase.from("mensajes_chat").insert([{
+        paciente_id: activeP.id, remitente: "cliente", contenido: text,
+      }]);
+      if (e1) { alert("Error guardando mensaje: " + e1.message); setSending(false); return; }
+      setInputText("");
+      await loadChat(activeP.id);
+
+      // Llamar a Claude
+      setIaThinking(true);
+      try {
+        const history = [...messages, { remitente: "cliente", contenido: text }]
+          .filter(m => m.remitente !== "admin")
+          .map(m => ({
+            role: m.remitente === "cliente" ? "user" : "assistant",
+            content: m.contenido,
+          }));
+
+        const res = await fetch("/api/chat", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            messages: history,
+            pacienteId: activeP.id,
+            phone: activeP.telefono || "test-dashboard",
+            canal: "dashboard-test",
+            opticaSlug: "glowvision",
+          }),
+        });
+        const data = await res.json();
+        const reply = data?.content?.[0]?.text || "Disculpa, no pude responder en este momento.";
+
+        await supabase.from("mensajes_chat").insert([{
+          paciente_id: activeP.id, remitente: "bot", contenido: reply,
+        }]);
+        await loadChat(activeP.id);
+      } catch (err) {
+        await supabase.from("mensajes_chat").insert([{
+          paciente_id: activeP.id, remitente: "bot",
+          contenido: "⚠️ Error técnico: no pude conectar con la IA. Verifica ANTHROPIC_API_KEY en Vercel.",
+        }]);
+        await loadChat(activeP.id);
+      }
+      setIaThinking(false);
+      setSending(false);
+    } else {
+      // Modo normal: operador responde como humano
+      const { error } = await supabase.from("mensajes_chat").insert([{
+        paciente_id: activeP.id, remitente: "admin", contenido: text,
+      }]);
+      setSending(false);
+      if (!error) { setInputText(""); loadChat(activeP.id); }
+    }
   };
 
   const applyQuickReply = (text) => {
@@ -504,6 +557,16 @@ export default function AukenOptica() {
                     style={{ background: C.surfaceL, border: `1px solid ${C.border}`, color: C.inkMid, padding: "5px 10px", borderRadius: 7, fontSize: 11, cursor: "pointer", fontWeight: 600 }}>
                     ↻
                   </button>
+                  <button onClick={() => setTestMode(v => !v)}
+                    style={{
+                      background: testMode ? `linear-gradient(135deg, ${C.purple}, ${C.neon})` : C.surfaceL,
+                      border: `1px solid ${testMode ? C.purple : C.border}`,
+                      color: testMode ? "#000" : C.inkMid,
+                      padding: "5px 10px", borderRadius: 7, fontSize: 11, cursor: "pointer", fontWeight: 700,
+                      boxShadow: testMode ? `0 0 12px ${C.purple}40` : "none",
+                    }}>
+                    🧪 {testMode ? "Modo Prueba ON" : "Probar IA"}
+                  </button>
                   <button onClick={() => setShowQuick(v => !v)}
                     style={{ background: showQuick ? `${C.amber}20` : C.surfaceL, border: `1px solid ${showQuick ? C.amber + "50" : C.border}`, color: showQuick ? C.amber : C.inkMid, padding: "5px 10px", borderRadius: 7, fontSize: 11, cursor: "pointer", fontWeight: 600 }}>
                     ⚡ Rápidas
@@ -514,6 +577,18 @@ export default function AukenOptica() {
                   </button>
                 </div>
               </div>
+
+              {/* Banner Modo Prueba */}
+              {testMode && (
+                <div style={{
+                  padding: "8px 18px", background: `linear-gradient(135deg, ${C.purple}15, ${C.neon}10)`,
+                  borderBottom: `1px solid ${C.purple}30`, display: "flex", alignItems: "center", gap: 10,
+                  fontSize: 11, color: C.purple, fontWeight: 600, animation: "slideIn 0.2s ease-out",
+                }}>
+                  <span style={{ fontSize: 13 }}>🧪</span>
+                  <span>Modo Prueba: tus mensajes se enviarán como si fueras el cliente. Claude IA responderá automáticamente.</span>
+                </div>
+              )}
 
               {/* Respuestas rápidas expandible */}
               {showQuick && (
@@ -535,6 +610,17 @@ export default function AukenOptica() {
                   <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: C.inkFaint, gap: 10 }}>
                     <div style={{ fontSize: 40, opacity: 0.15 }}>💬</div>
                     <div style={{ fontSize: 12, opacity: 0.4 }}>Sin mensajes con este paciente</div>
+                  </div>
+                )}
+
+                {iaThinking && (
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", background: `${C.neon}10`, border: `1px solid ${C.neon}30`, borderRadius: 12, alignSelf: "flex-start", marginBottom: 10, animation: "fadeUp 0.2s" }}>
+                    <span style={{ fontSize: 11, color: C.neon, fontWeight: 700 }}>🤖 Aukén IA está pensando</span>
+                    <span style={{ display: "flex", gap: 3 }}>
+                      {[0, 1, 2].map(i => (
+                        <span key={i} style={{ width: 5, height: 5, borderRadius: "50%", background: C.neon, animation: `blink 1.4s infinite ${i * 0.2}s` }} />
+                      ))}
+                    </span>
                   </div>
                 )}
 
@@ -588,20 +674,26 @@ export default function AukenOptica() {
                     value={inputText}
                     onChange={e => setInputText(e.target.value)}
                     onKeyDown={e => e.key === "Enter" && !e.shiftKey && handleSend()}
-                    placeholder="Responder como operador..."
+                    placeholder={testMode ? "Escribe como cliente para probar la IA..." : "Responder como operador..."}
                     style={{ flex: 1, background: "transparent", border: "none", color: C.ink, outline: "none", fontSize: 13 }}
                   />
                   <button onClick={handleSend} disabled={!inputText.trim() || sending} style={{
-                    background: inputText.trim() ? `linear-gradient(135deg, ${C.primary}, ${C.primaryD})` : C.surfaceXL,
+                    background: inputText.trim()
+                      ? testMode
+                        ? `linear-gradient(135deg, ${C.purple}, ${C.neon})`
+                        : `linear-gradient(135deg, ${C.primary}, ${C.primaryD})`
+                      : C.surfaceXL,
                     color: inputText.trim() ? "#000" : C.inkFaint,
                     border: "none", borderRadius: 8, padding: "7px 18px",
                     fontWeight: 700, fontSize: 12, cursor: inputText.trim() ? "pointer" : "default", transition: "all .15s", flexShrink: 0,
                   }}>
-                    {sending ? "…" : "Enviar"}
+                    {sending ? "…" : testMode ? "▶ Probar" : "Enviar"}
                   </button>
                 </div>
                 <div style={{ fontSize: 10, color: C.inkFaint, marginTop: 5, paddingLeft: 2 }}>
-                  Enter para enviar · ⚡ para respuestas predefinidas
+                  {testMode
+                    ? "🧪 Modo Prueba activo — Claude IA responderá según el system prompt configurado"
+                    : "Enter para enviar · ⚡ para respuestas predefinidas · 🧪 para probar la IA"}
                 </div>
               </div>
             </>

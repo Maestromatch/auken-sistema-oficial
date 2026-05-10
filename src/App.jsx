@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from "react-router-dom";
 import AukenOS              from "./pages/AukenOS";
 import AukenOptica          from "./pages/AukenOptica";
 import AukenOpticaLanding   from "./pages/AukenOpticaLanding";
@@ -8,9 +8,10 @@ import AukenAdmin           from "./pages/AukenAdmin";
 
 // Protected Route Component
 function ProtectedRoute({ children }) {
+  const location = useLocation();
   const isAuthenticated = localStorage.getItem("auken_auth") === "true";
   const isSuspended = localStorage.getItem("auken_suspended") === "true";
-  if (!isAuthenticated) return <Navigate to="/login" />;
+  if (!isAuthenticated) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
   if (isSuspended) return (
     <div style={{ background: "#090A0F", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontFamily: "'Inter', sans-serif" }}>
       <div style={{ textAlign: "center", maxWidth: 400 }}>
