@@ -23,11 +23,17 @@ function ProtectedRoute({ children }) {
   return children;
 }
 
+function RootRedirect() {
+  const isAuthenticated = localStorage.getItem("auken_auth") === "true";
+  return <Navigate to={isAuthenticated ? "/optica/dashboard" : "/login"} replace />;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route path="/"                  element={<AukenOS />} />
+        <Route path="/"                  element={<RootRedirect />} />
+        <Route path="/os"                element={<AukenOS />} />
         <Route path="/login"             element={<AukenLogin />} />
 
         {/* Óptica */}
