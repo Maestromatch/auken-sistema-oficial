@@ -42,6 +42,11 @@ export default function App() {
         <Route path="/optica/landing"    element={<AukenOpticaLanding />} />
         <Route path="/optica/dashboard"  element={<ProtectedRoute><AukenOpticaDashboard /></ProtectedRoute>} />
 
+        {/* Aliases para evitar 404 si el usuario tipea URL parcial */}
+        <Route path="/dashboard"         element={<Navigate to="/optica/dashboard" replace />} />
+        <Route path="/monitor"           element={<Navigate to="/optica" replace />} />
+        <Route path="/chat"              element={<Navigate to="/optica" replace />} />
+
         <Route path="/admin"             element={<AukenAdmin />} />
         <Route path="*"                  element={<Navigate to="/" replace />} />
       </Routes>
