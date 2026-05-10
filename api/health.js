@@ -20,16 +20,22 @@ export default async function handler(req, res) {
     "ANTHROPIC_API_KEY",
     "SUPABASE_URL",
     "SUPABASE_SERVICE_ROLE_KEY",
-    "WHATSAPP_TOKEN",
-    "PHONE_NUMBER_ID",
-    "VERIFY_TOKEN",
     "WORKER_SECRET",
   ];
 
+  const optionalEnvs = [
+    "WHATSAPP_TOKEN",
+    "PHONE_NUMBER_ID",
+    "VERIFY_TOKEN",
+  ];
+
   const missingEnvs = requiredEnvs.filter(k => !process.env[k]);
+  const missingOptional = optionalEnvs.filter(k => !process.env[k]);
   checks.components.env = {
     ok: missingEnvs.length === 0,
     missing: missingEnvs,
+    optional_missing: missingOptional,
+    whatsapp_ready: missingOptional.length === 0,
   };
   if (missingEnvs.length > 0) allOk = false;
 
