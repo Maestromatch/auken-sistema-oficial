@@ -68,6 +68,28 @@ const QUICK_REPLIES = [
 ];
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+const DASHBOARD_PATH = "/optica/dashboard";
+
+function dashboardUrl() {
+  if (typeof window === "undefined") return DASHBOARD_PATH;
+  return `${window.location.origin}${DASHBOARD_PATH}`;
+}
+
+function goDashboard(e) {
+  e?.preventDefault?.();
+  e?.stopPropagation?.();
+  try {
+    localStorage.setItem("auken_auth", "true");
+  } catch {}
+
+  const url = dashboardUrl();
+  try {
+    window.location.assign(url);
+  } catch {
+    window.location.href = url;
+  }
+}
+
 function fmtTime(ts) {
   if (!ts) return "";
   const d = new Date(ts), now = new Date(), diff = (now - d) / 1000;
@@ -239,11 +261,11 @@ function PatientPanel({ p, onClose, onGoToDashboard }) {
 
       {/* Acciones */}
       <div style={{ padding: "14px 16px", borderTop: `1px solid ${C.border}`, display: "flex", flexDirection: "column", gap: 7 }}>
-        <button onClick={onGoToDashboard} style={{
+        <a href={dashboardUrl()} onMouseDown={onGoToDashboard} onClick={onGoToDashboard} style={{
           background: `${C.primary}15`, color: C.primary, border: `1px solid ${C.primary}35`,
           borderRadius: 8, padding: "8px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer",
-          width: "100%", textAlign: "center",
-        }}>📋 Ver ficha completa</button>
+          width: "100%", textAlign: "center", textDecoration: "none", display: "block", position: "relative", zIndex: 5,
+        }}>📋 Ver ficha completa</a>
         {p.telefono && (
           <button onClick={() => window.open(`https://wa.me/${p.telefono.replace(/\D/g, "")}`, "_blank")} style={{
             background: "rgba(37,211,102,0.1)", color: "#25D366", border: "1px solid rgba(37,211,102,0.2)",
@@ -626,10 +648,10 @@ export default function AukenOptica() {
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <button onClick={() => { window.location.href = "/optica/dashboard"; }}
-            style={{ background: `${C.primary}15`, color: C.primary, border: `1px solid ${C.primary}30`, borderRadius: 6, padding: "5px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center" }}>
+          <a href={dashboardUrl()} onMouseDown={goDashboard} onClick={goDashboard}
+            style={{ background: `${C.primary}15`, color: C.primary, border: `1px solid ${C.primary}30`, borderRadius: 6, padding: "5px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", textDecoration: "none", position: "relative", zIndex: 5 }}>
             📊 Dashboard
-          </button>
+          </a>
           <button onClick={() => { localStorage.removeItem("auken_auth"); navigate("/login"); }}
             style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.inkFaint, borderRadius: 6, padding: "5px 10px", fontSize: 11, cursor: "pointer" }}>
             Salir
@@ -926,7 +948,7 @@ export default function AukenOptica() {
             <PatientPanel
               p={activeP}
               onClose={() => setShowPanel(false)}
-              onGoToDashboard={() => { window.location.href = "/optica/dashboard"; }}
+              onGoToDashboard={goDashboard}
             />
           </div>
         )}
