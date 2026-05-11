@@ -218,7 +218,7 @@ function ToastStack({ toasts, closeToast }) {
           .auken-toast-wrap > div { min-width: 0 !important; max-width: none !important; width: 100% !important; }
         }
       `}</style>
-      <div className="auken-toast-wrap" style={{
+      <div className="auken-toast-wrap auken-toast-stack" style={{
         position: "fixed",
         bottom: 20,
         right: 20,

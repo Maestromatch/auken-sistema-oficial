@@ -169,7 +169,7 @@ function KpiCard({ label, value, sub, delta, accent = C.text, series = [], glow 
 
       {/* Row: valor + sparkline */}
       <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 8 }}>
-        <span style={{
+        <span className="auken-kpi-value" style={{
           fontFamily: C.fontMono, fontSize: 30, lineHeight: 1,
           fontWeight: 600, letterSpacing: '-0.02em',
           color: accent, fontVariantNumeric: 'tabular-nums',
@@ -200,6 +200,144 @@ function KpiCard({ label, value, sub, delta, accent = C.text, series = [], glow 
 // Backward compat — algunos lugares del código aún usan <KPI>
 function KPI({ label, value, color, sub, glow }) {
   return <KpiCard label={label} value={value} accent={color} sub={sub} glow={glow} series={makeSeries(value)} />;
+}
+
+function ResponsiveGlobals() {
+  return (
+    <style>{`
+      @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+      * { box-sizing: border-box; margin: 0; padding: 0; }
+      ::-webkit-scrollbar { width: 6px; background: ${C.bg}; }
+      ::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 6px; }
+      @keyframes auken-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+      .auken-shell {
+        padding: 24px 32px 32px;
+        max-width: 1200px;
+        margin: 0 auto;
+      }
+      @media (max-width: 768px) {
+        .auken-shell { padding: 16px; }
+      }
+
+      .auken-kpi-grid {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 12px;
+      }
+      .auken-kpi-grid--activity {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+      @media (max-width: 1024px) {
+        .auken-kpi-grid,
+        .auken-kpi-grid--activity { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+      }
+      @media (max-width: 420px) {
+        .auken-kpi-grid,
+        .auken-kpi-grid--activity { grid-template-columns: 1fr; }
+      }
+
+      .auken-kpi-value { font-size: 30px; }
+      @media (max-width: 768px) {
+        .auken-kpi-value { font-size: 24px !important; }
+      }
+
+      .auken-tabs {
+        display: flex;
+        gap: 4px;
+        overflow-x: auto;
+        scroll-snap-type: x mandatory;
+        scrollbar-width: none;
+        -ms-overflow-style: none;
+        padding-bottom: 1px;
+        margin-bottom: 20px;
+        border-bottom: 1px solid ${C.border};
+        mask-image: linear-gradient(90deg, transparent 0, #000 16px, #000 calc(100% - 24px), transparent 100%);
+      }
+      .auken-tabs::-webkit-scrollbar { display: none; }
+      .auken-tab {
+        scroll-snap-align: start;
+        flex-shrink: 0;
+      }
+
+      @media (max-width: 768px) {
+        .auken-tab,
+        button.auken-touch { min-height: 44px; }
+      }
+
+      @media (max-width: 480px) {
+        .auken-toast-stack,
+        .auken-toast-wrap {
+          left: 12px !important;
+          right: 12px !important;
+          bottom: 12px !important;
+          max-width: none !important;
+        }
+        .auken-toast-stack > div > div,
+        .auken-toast-wrap > div > div {
+          min-width: 0 !important;
+          max-width: 100% !important;
+          width: 100% !important;
+        }
+      }
+    `}</style>
+  );
+}
+
+function DashboardTab({ active, icon, label, count, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className="auken-tab auken-touch"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 8,
+        height: 36,
+        padding: "0 14px",
+        background: active ? C.surfaceL : "transparent",
+        color: active ? C.text : C.textDim,
+        border: "none",
+        borderRadius: C.radius,
+        fontSize: 13,
+        fontWeight: 500,
+        fontFamily: C.fontSans,
+        letterSpacing: "-0.01em",
+        cursor: "pointer",
+        whiteSpace: "nowrap",
+        position: "relative",
+        transition: `color ${C.dur} ${C.ease}, background ${C.dur} ${C.ease}`,
+      }}
+    >
+      <span style={{ fontSize: 14, opacity: active ? 1 : 0.7 }}>{icon}</span>
+      {label}
+      {typeof count === "number" && (
+        <span style={{
+          fontFamily: C.fontMono,
+          fontSize: 11,
+          fontWeight: 600,
+          padding: "1px 6px",
+          borderRadius: C.radiusSm,
+          background: active ? C.primarySoft : C.surfaceL,
+          color: active ? C.primary : C.textDim,
+          fontVariantNumeric: "tabular-nums",
+        }}>
+          {count}
+        </span>
+      )}
+      {active && (
+        <span style={{
+          position: "absolute",
+          left: 12,
+          right: 12,
+          bottom: -1,
+          height: 2,
+          background: C.primary,
+          borderRadius: 2,
+        }} />
+      )}
+    </button>
+  );
 }
 
 // Skeleton loading — mantiene layout y evita la sensación de "pantalla esperando".
@@ -258,11 +396,7 @@ function TableRowSkeleton({ cols = 5 }) {
 function DashboardSkeleton() {
   return (
     <div style={{ background: C.bg, minHeight: "100vh", color: C.text, fontFamily: C.fontSans }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        @keyframes auken-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-      `}</style>
+      <ResponsiveGlobals />
       <nav style={{
         background: C.surface,
         borderBottom: `1px solid ${C.border}`,
@@ -283,14 +417,14 @@ function DashboardSkeleton() {
           <Skeleton w={92} h={30} r={C.radius} />
         </div>
       </nav>
-      <main style={{ padding: "24px 32px 40px", maxWidth: 1200, margin: "0 auto" }}>
+      <main className="auken-shell">
         <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
           {[82, 72, 86, 74, 110].map((w, i) => <Skeleton key={i} w={w} h={32} r={C.radius} />)}
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 16 }}>
+        <div className="auken-kpi-grid" style={{ marginBottom: 16 }}>
           {Array.from({ length: 4 }).map((_, i) => <KpiSkeleton key={i} />)}
         </div>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 16 }}>
+        <div className="auken-kpi-grid auken-kpi-grid--activity" style={{ marginBottom: 16 }}>
           {Array.from({ length: 3 }).map((_, i) => <KpiSkeleton key={i} />)}
         </div>
         <Card>
@@ -683,7 +817,7 @@ function TabMetricas({ optica, stats }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {/* Fila 1 — recetas */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
+      <div className="auken-kpi-grid">
         <KpiCard
           label="Total Pacientes" value={total} accent={C.text}
           sub="en la base de datos" series={makeSeries(total)}
@@ -704,7 +838,7 @@ function TabMetricas({ optica, stats }) {
       </div>
 
       {/* Fila 2 — actividad */}
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+      <div className="auken-kpi-grid auken-kpi-grid--activity">
         <KpiCard
           label="💬 Conversaciones 24h" value={conv24} accent={C.blue}
           sub="bot atendiendo en vivo" series={makeSeries(conv24)}
@@ -2063,13 +2197,7 @@ export default function AukenOpticaDashboard() {
 
   return (
     <div style={{ background: C.bg, minHeight: "100vh", color: C.text, fontFamily: "'Inter', sans-serif" }}>
-      <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
-        * { box-sizing: border-box; margin: 0; padding: 0; }
-        ::-webkit-scrollbar { width: 6px; background: ${C.bg}; }
-        ::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 6px; }
-        @keyframes auken-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
-      `}</style>
+      <ResponsiveGlobals />
 
       {/* TOPNAV */}
       <nav style={{
@@ -2092,7 +2220,7 @@ export default function AukenOpticaDashboard() {
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 6 : 12, flexShrink: 0 }}>
-          <button onClick={() => navigate("/optica")}
+          <button className="auken-touch" onClick={() => navigate("/optica")}
             title="Ir al monitor de conversaciones"
             style={{ background: C.primarySoft, border: `1px solid ${C.primaryRing}`, color: C.primary, borderRadius: C.radius, padding: isMobile ? "5px 10px" : "5px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", letterSpacing: '-0.01em', transition: `background ${C.dur} ${C.ease}` }}>
             💬 {isMobile ? "" : "Chat"}
@@ -2103,7 +2231,7 @@ export default function AukenOpticaDashboard() {
               Activo
             </div>
           )}
-          <button onClick={() => { localStorage.removeItem("auken_auth"); navigate("/login"); }}
+          <button className="auken-touch" onClick={() => { localStorage.removeItem("auken_auth"); navigate("/login"); }}
             style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textDim, borderRadius: C.radius, padding: isMobile ? "5px 10px" : "5px 12px", fontSize: 12, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap", letterSpacing: '-0.01em' }}>
             {isMobile ? "Salir" : "Cerrar sesión"}
           </button>
@@ -2111,33 +2239,13 @@ export default function AukenOpticaDashboard() {
       </nav>
 
       {/* TABS */}
-      <div style={{ padding: isMobile ? "12px 10px 24px" : "24px 32px 32px", maxWidth: 1200, margin: "0 auto" }}>
-        <div style={{ display: "flex", gap: 2, borderBottom: `1px solid ${C.border}`, paddingBottom: 0, marginBottom: 20, overflowX: "auto", scrollbarWidth: "none" }}>
-          {[
-            ["metricas",  "📊 Métricas"],
-            ["enlive",    isMobile ? "🔴 Vivo" : "🔴 En Vivo"],
-            ["pacientes", isMobile ? `👥 (${pacientes.length})` : `👥 Pacientes (${pacientes.length})`],
-            ["citas",     isMobile ? `📅 (${citas.filter(c => c.estado === "pendiente_confirmacion").length})` : `📅 Citas (${citas.filter(c => c.estado === "pendiente_confirmacion").length})`],
-            ["config",    isMobile ? "⚙️" : "⚙️ Config"],
-          ].map(([id, label]) => (
-            <button key={id} onClick={() => setTab(id)} style={{
-              background: "transparent",
-              color: tab === id ? C.text : C.textDim,
-              border: "none",
-              borderBottom: tab === id ? `2px solid ${C.primary}` : "2px solid transparent",
-              borderRadius: 0,
-              padding: isMobile ? "8px 12px" : "9px 16px",
-              fontSize: isMobile ? 12 : 13,
-              fontWeight: tab === id ? 600 : 400,
-              cursor: "pointer",
-              transition: `color ${C.dur} ${C.ease}, border-color ${C.dur} ${C.ease}`,
-              whiteSpace: "nowrap",
-              letterSpacing: '-0.01em',
-              marginBottom: -1,
-            }}>
-              {label}
-            </button>
-          ))}
+      <div className="auken-shell">
+        <div className="auken-tabs">
+          <DashboardTab active={tab === "metricas"} icon="📊" label="Métricas" onClick={() => setTab("metricas")} />
+          <DashboardTab active={tab === "enlive"} icon="🔴" label="En Vivo" onClick={() => setTab("enlive")} />
+          <DashboardTab active={tab === "pacientes"} icon="👥" label="Pacientes" count={pacientes.length} onClick={() => setTab("pacientes")} />
+          <DashboardTab active={tab === "citas"} icon="📅" label="Citas" count={citas.filter(c => c.estado === "pendiente_confirmacion").length} onClick={() => setTab("citas")} />
+          <DashboardTab active={tab === "config"} icon="⚙️" label="Configuración" onClick={() => setTab("config")} />
         </div>
 
         {tab === "metricas" && <TabMetricas optica={optica} stats={stats} />}
