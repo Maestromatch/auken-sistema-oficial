@@ -1,6 +1,7 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+import { useToaster } from "../components/Toaster";
 
 // =============================================================
 // AUKÉN OPTICA DASHBOARD — versión limpia
@@ -32,6 +33,26 @@ const C = {
 // ─────────────────────────────────────────────────────────────
 // MICRO COMPONENTES
 // ─────────────────────────────────────────────────────────────
+// Helper: genera link "Add to Google Calendar" para una cita
+function buildCalLinkForCita(c, optica) {
+  if (!c?.fecha) return null;
+  try {
+    const hora = c.hora || "12:00";
+    const start = new Date(`${c.fecha}T${hora}:00`);
+    if (isNaN(start.getTime())) return null;
+    const end = new Date(start.getTime() + 30 * 60 * 1000);
+    const fmt = (d) => d.toISOString().replace(/[-:]|\.\d{3}/g, "");
+    const params = new URLSearchParams({
+      action: "TEMPLATE",
+      text: `${optica?.nombre || "Aukén"} — ${c.servicio || "Cita"}`,
+      dates: `${fmt(start)}/${fmt(end)}`,
+      details: `Paciente: ${c.nombre || "—"}\nTeléfono: ${c.telefono || "—"}\nServicio: ${c.servicio || "—"}\nOrigen: ${c.origen === "bot-ia" ? "Aukén IA" : (c.origen || "manual")}`,
+      location: `${optica?.direccion || ""}${optica?.ciudad ? ", " + optica.ciudad : ""}`,
+    });
+    return `https://www.google.com/calendar/render?${params.toString()}`;
+  } catch { return null; }
+}
+
 function Card({ children, style = {}, accent }) {
   return (
     <div style={{
@@ -479,17 +500,34 @@ function TabCitas({ citas, refresh, optica, pacientes }) {
                   : c.estado === "cancelada" ? C.red
                   : c.estado === "completada" ? C.blue
                   : C.amber;
+                const isBot = c.origen === "bot-ia";
+                const origenColor = isBot ? "#A78BFA" : C.blue;
+                const origenLabel = isBot ? "🤖 IA" : (c.origen || "manual");
+
+                // Generar Google Calendar link al vuelo
+                const calLink = c.fecha ? buildCalLinkForCita(c, optica) : null;
+
                 return (
-                  <tr key={c.id} style={{ borderBottom: `1px solid ${C.border}` }}>
+                  <tr key={c.id} style={{
+                    borderBottom: `1px solid ${C.border}`,
+                    background: isBot ? "rgba(167,139,250,0.04)" : "transparent",
+                  }}>
                     <td style={{ padding: "12px 16px" }}>
                       <div style={{ fontWeight: 600, color: C.text, fontSize: 13 }}>{c.nombre || `Paciente #${c.paciente_id}`}</div>
                       {c.telefono && <div style={{ fontSize: 11, color: C.textDim }}>{c.telefono}</div>}
                     </td>
                     <td style={{ padding: "12px 16px", fontSize: 13, color: C.text }}>{c.servicio || "—"}</td>
                     <td style={{ padding: "12px 16px", fontSize: 13, color: C.text }}>{c.fecha} {c.hora && `· ${c.hora}`}</td>
-                    <td style={{ padding: "12px 16px" }}><Pill label={c.origen || "manual"} color={C.blue} /></td>
+                    <td style={{ padding: "12px 16px" }}><Pill label={origenLabel} color={origenColor} /></td>
                     <td style={{ padding: "12px 16px" }}><Pill label={c.estado} color={estadoColor} /></td>
-                    <td style={{ padding: "12px 16px", display: "flex", gap: 6 }}>
+                    <td style={{ padding: "12px 16px", display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      {calLink && (
+                        <a href={calLink} target="_blank" rel="noopener noreferrer"
+                          title="Agregar a Google Calendar"
+                          style={{ background: "rgba(66,133,244,0.15)", color: "#7DD3FC", border: "1px solid rgba(66,133,244,0.4)", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11, fontWeight: 600, textDecoration: "none" }}>
+                          📅 Calendar
+                        </a>
+                      )}
                       {c.estado === "pendiente_confirmacion" && (
                         <button onClick={() => updateCita(c.id, "confirmada")}
                           style={{ background: `${C.green}20`, color: C.green, border: `1px solid ${C.green}40`, padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11, fontWeight: 600 }}>
@@ -910,15 +948,36 @@ export default function AukenOpticaDashboard() {
     return () => clearInterval(interval);
   }, [refresh]);
 
-  // Real-time multi-dispositivo: cualquier cambio en pacientes/citas → refresh
+  const { toast } = useToaster();
+  const initialLoadDone = useRef(false);
+
+  // Real-time multi-dispositivo + notificaciones toast
   useEffect(() => {
     const sub = supabase.channel("dashboard_live")
-      .on("postgres_changes", { event: "*", schema: "public", table: "pacientes" }, () => refresh())
-      .on("postgres_changes", { event: "*", schema: "public", table: "citas" },     () => refresh())
-      .on("postgres_changes", { event: "*", schema: "public", table: "opticas" },   () => refresh())
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "pacientes" }, (p) => {
+        refresh();
+        if (initialLoadDone.current) {
+          toast.success("Paciente registrado", { sub: p.new.nombre || "Nuevo paciente añadido" });
+        }
+      })
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "citas" }, (p) => {
+        refresh();
+        if (initialLoadDone.current) {
+          const isBot = p.new.origen === "bot-ia";
+          const fechaFmt = `${p.new.fecha || ""}${p.new.hora ? " · " + p.new.hora : ""}`;
+          toast.cita(isBot ? "🤖 IA agendó una cita" : "Nueva cita agendada", {
+            sub: `${p.new.nombre || "Paciente"} — ${p.new.servicio || "servicio"} — ${fechaFmt}`,
+            duration: 8000,
+          });
+        }
+      })
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "pacientes" }, () => refresh())
+      .on("postgres_changes", { event: "UPDATE", schema: "public", table: "citas" },     () => refresh())
+      .on("postgres_changes", { event: "*",      schema: "public", table: "opticas" },   () => refresh())
       .subscribe();
+    setTimeout(() => { initialLoadDone.current = true; }, 1500);
     return () => supabase.removeChannel(sub);
-  }, [refresh]);
+  }, [refresh, toast]);
 
   // Title dinámico (también después de useState)
   useEffect(() => {

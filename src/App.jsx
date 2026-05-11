@@ -5,6 +5,7 @@ import AukenOpticaLanding   from "./pages/AukenOpticaLanding";
 import AukenOpticaDashboard from "./pages/AukenOpticaDashboard";
 import AukenLogin           from "./pages/AukenLogin";
 import AukenAdmin           from "./pages/AukenAdmin";
+import { ToasterProvider }  from "./components/Toaster";
 
 // Protected Route Component
 function ProtectedRoute({ children }) {
@@ -31,6 +32,7 @@ function RootRedirect() {
 
 export default function App() {
   return (
+    <ToasterProvider>
     <BrowserRouter>
       <Routes>
         <Route path="/"                  element={<RootRedirect />} />
@@ -51,5 +53,6 @@ export default function App() {
         <Route path="*"                  element={<Navigate to="/" replace />} />
       </Routes>
     </BrowserRouter>
+    </ToasterProvider>
   );
 }

@@ -8,3 +8,7 @@ dist
 .env*.local
 *.pdf
 *.docx
+# Imágenes sueltas en raíz (screenshots, etc.) — públicas e iconos sí
+/*.jpg
+/*.jpeg
+/*.png

@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+import { useToaster } from "../components/Toaster";
 
 // Hook responsive — detecta tamaño de pantalla
 function useViewport() {
@@ -235,6 +236,7 @@ export default function AukenOptica() {
   const bottomRef  = useRef(null);
   const inputRef   = useRef(null);
   const { isMobile, isTablet } = useViewport();
+  const { toast } = useToaster();
   const [showSidebar, setShowSidebar] = useState(false); // móvil: drawer cerrado por defecto
 
   const [activeP,   setActiveP]   = useState(null);
@@ -312,13 +314,30 @@ export default function AukenOptica() {
           setMessages(prev => [...prev, m]);
         } else if (m.remitente === "cliente") {
           setUnreadMap(prev => ({ ...prev, [m.paciente_id]: (prev[m.paciente_id] || 0) + 1 }));
-          // Alerta visual
+          // Alerta visual + toast notificación
           setPatients(prev => {
             const p = prev.find(x => x.id === m.paciente_id);
-            if (p) setNewMsgAlert(p.nombre || "Paciente");
+            if (p) {
+              setNewMsgAlert(p.nombre || "Paciente");
+              toast.chat("Nuevo mensaje", {
+                sub: `${p.nombre}: ${(m.contenido || "").slice(0, 60)}${(m.contenido || "").length > 60 ? "..." : ""}`,
+                action: { label: "Abrir chat", onClick: () => { setActiveP(p); setShowSidebar(false); } },
+                duration: 6000,
+              });
+            }
             return prev;
           });
           setTimeout(() => setNewMsgAlert(null), 4000);
+        } else if (m.remitente === "bot" && m.metadata?.type === "system_booking_confirmation") {
+          // Notificar al operador que el bot agendó algo
+          toast.cita("IA agendó una cita", {
+            sub: m.contenido?.split("\n")[0]?.replace("✅ ", "") || "Nueva cita agendada por la IA",
+            action: m.metadata?.calendar_url ? {
+              label: "Google Calendar",
+              onClick: () => window.open(m.metadata.calendar_url, "_blank"),
+            } : undefined,
+            duration: 10000,
+          });
         }
       })
       // Pacientes (INSERT/UPDATE/DELETE) — sincroniza entre notebooks
@@ -778,7 +797,7 @@ export default function AukenOptica() {
             <PatientPanel
               p={activeP}
               onClose={() => setShowPanel(false)}
-              onGoToDashboard={() => navigate("/optica/dashboard")}
+              onGoToDashboard={() => window.open("/optica/dashboard", "_blank")}
             />
           </div>
         )}
