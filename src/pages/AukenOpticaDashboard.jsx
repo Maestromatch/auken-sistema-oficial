@@ -683,11 +683,18 @@ function TabConfiguracion({ optica, refresh }) {
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
   const [saveError, setSaveError] = useState(null);
+  // Guarda el último payload guardado para que el useEffect no lo pise
+  // cuando refresh() devuelve datos de BD que aún no tienen la columna servicios
+  // (es decir, antes de ejecutar la migración 007)
+  const lastSavedRef = useRef(null);
 
-  // Solo sincronizar desde la BD si el usuario NO está editando activamente
-  // Esto evita el bug donde refresh() pisaba los cambios del usuario
+  // Solo sincronizar desde la BD si el usuario NO está editando activamente.
+  // Merge con lastSavedRef para preservar campos que la BD aún no devuelve
+  // (migración 007 pendiente → servicios/ciudad/etc. vendrán null hasta ejecutarla).
   useEffect(() => {
-    if (!dirty) setEdit(optica);
+    if (!dirty) {
+      setEdit({ ...(optica || {}), ...(lastSavedRef.current || {}) });
+    }
   }, [optica, dirty]);
 
   const upd = (field, value) => {
@@ -731,7 +738,8 @@ function TabConfiguracion({ optica, refresh }) {
     setSaving(false);
     if (!error) {
       setSaved(true);
-      setDirty(false);   // ← limpia dirty ANTES de refresh para que el useEffect pueda sincronizar
+      lastSavedRef.current = payload;  // ← preserva lo guardado ante refresh() con BD sin migración 007
+      setDirty(false);                 // ← limpia dirty para que el useEffect sincronice (con merge)
       refresh();
       setTimeout(() => setSaved(false), 3000);
     } else {
@@ -763,8 +771,28 @@ function TabConfiguracion({ optica, refresh }) {
     </div>
   );
 
+  // Detectar si la BD aún no tiene la columna servicios (migración 007 pendiente)
+  const needsMigration007 = optica && (optica.servicios === undefined || optica.servicios === null) && !lastSavedRef.current;
+
   return (
     <Card>
+      {/* Banner migración 007 — se oculta automáticamente tras ejecutar la migración */}
+      {needsMigration007 && (
+        <div style={{
+          background: `${C.amber}12`, border: `1px solid ${C.amber}40`,
+          borderRadius: 10, padding: "12px 16px", marginBottom: 20,
+          fontSize: 12, color: C.amber, lineHeight: 1.6,
+        }}>
+          <div style={{ fontWeight: 700, marginBottom: 4 }}>⚠️ Migración 007 requerida para guardar Servicios</div>
+          <div style={{ color: C.textDim }}>
+            Los cambios de nombre/horario/teléfono ya se guardan correctamente.
+            Para que los <strong style={{ color: C.amber }}>servicios y precios</strong> persistan en la BD, ejecuta la migración en:
+            <br />
+            <strong style={{ color: C.text }}>Supabase → SQL Editor → migrations/007_opticas_completar_columnas.sql</strong>
+          </div>
+        </div>
+      )}
+
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 6 }}>
           <h3 style={{ fontSize: 18, fontWeight: 700, color: C.text }}>⚙️ Configuración de la Óptica</h3>
