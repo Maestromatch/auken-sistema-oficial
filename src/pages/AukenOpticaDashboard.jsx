@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef } from "react";
+import { useState, useEffect, useCallback, useRef, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useToaster } from "../components/Toaster";
@@ -228,6 +228,7 @@ function TabMetricas({ optica, stats }) {
 // TAB: PACIENTES
 // ─────────────────────────────────────────────────────────────
 function TabPacientes({ optica, pacientes, refresh, handleSendWhatsApp, onEdit, onCreate }) {
+  const { isMobile } = useViewport();
   const [search, setSearch] = useState("");
   const filtered = search.trim()
     ? pacientes.filter(p => {
@@ -247,7 +248,7 @@ function TabPacientes({ optica, pacientes, refresh, handleSendWhatsApp, onEdit, 
             {filtered.length !== pacientes.length ? `${filtered.length} de ${pacientes.length} mostrados` : `${pacientes.length} registrados`}
           </div>
         </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flex: 1, maxWidth: 340 }}>
+        <div style={{ display: "flex", gap: 8, alignItems: "center", flex: 1, maxWidth: isMobile ? "100%" : 340 }}>
           <input
             value={search}
             onChange={e => setSearch(e.target.value)}
@@ -262,70 +263,112 @@ function TabPacientes({ optica, pacientes, refresh, handleSendWhatsApp, onEdit, 
         <button onClick={onCreate} style={{
           background: C.primary, color: "#000", border: "none", borderRadius: 6,
           padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
-        }}>+ Nuevo Paciente</button>
+        }}>+ Nuevo</button>
       </div>
 
-      <div style={{ overflowX: "auto" }}>
-        <table style={{ width: "100%", borderCollapse: "collapse" }}>
-          <thead>
-            <tr style={{ background: `${C.surfaceL}80` }}>
-              {["Paciente", "Contacto", "Receta", "Estado", "Acciones"].map(h => (
-                <th key={h} style={{ padding: "12px 16px", fontSize: 11, color: C.textMuted, fontWeight: 600, textTransform: "uppercase", textAlign: "left" }}>{h}</th>
-              ))}
-            </tr>
-          </thead>
-          <tbody>
-            {filtered.length === 0 && (
-              <tr><td colSpan="5" style={{ padding: "40px", textAlign: "center", color: C.textDim, fontSize: 13 }}>
-                {search ? `Sin resultados para "${search}"` : "Aún no hay pacientes. Agrega el primero arriba o captúralos automáticamente desde WhatsApp."}
-              </td></tr>
-            )}
-            {filtered.map(p => {
-              const dias = p.fecha_ultima_visita
-                ? Math.floor((Date.now() - new Date(p.fecha_ultima_visita).getTime()) / (1000 * 60 * 60 * 24))
-                : null;
-              const estado = dias === null ? "sin_datos" : dias > 365 ? "vencida" : dias > 335 ? "proxima" : "vigente";
-              const estadoColor = estado === "vencida" ? C.red : estado === "proxima" ? C.amber : estado === "vigente" ? C.green : C.textMuted;
-              const estadoLabel = estado === "vencida" ? `Vencida (${dias}d)` : estado === "proxima" ? `Próxima (${365 - dias}d)` : estado === "vigente" ? "Vigente" : "Sin receta";
-
-              return (
-                <tr key={p.id} style={{ borderBottom: `1px solid ${C.border}`, cursor: "pointer" }}
-                  onClick={() => onEdit(p)}
-                  onMouseEnter={e => e.currentTarget.style.background = `${C.surfaceL}40`}
-                  onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                >
-                  <td style={{ padding: "12px 16px" }}>
-                    <div style={{ fontWeight: 600, color: C.text, fontSize: 14 }}>{p.nombre || "Sin nombre"}</div>
-                    <div style={{ fontSize: 11, color: C.textDim, marginTop: 2 }}>RUT: {p.rut || "—"}</div>
-                  </td>
-                  <td style={{ padding: "12px 16px" }}>
-                    <div style={{ fontSize: 13, color: C.text }}>{p.telefono || "—"}</div>
-                    <div style={{ fontSize: 11, color: C.textDim, marginTop: 2 }}>Visita: {p.fecha_ultima_visita || "—"}</div>
-                  </td>
-                  <td style={{ padding: "12px 16px" }}>
-                    <Pill label={estadoLabel} color={estadoColor} />
-                  </td>
-                  <td style={{ padding: "12px 16px" }}>
-                    <Pill
-                      label={p.estado_compra || "Pendiente"}
-                      color={p.estado_compra === "Compró" ? C.green : p.estado_compra === "No Compró" ? C.red : C.textMuted}
-                    />
-                    {p.monto_venta && <div style={{ fontSize: 11, color: C.green, fontWeight: 700, marginTop: 2 }}>${Number(p.monto_venta).toLocaleString("es-CL")}</div>}
-                  </td>
-                  <td style={{ padding: "12px 16px", display: "flex", gap: 8 }}>
-                    <button onClick={(e) => { e.stopPropagation(); handleSendWhatsApp(p); }}
-                      style={{ background: "rgba(37, 211, 102, 0.15)", border: `1px solid #25D36640`, color: "#25D366", borderRadius: 6, padding: "6px 10px", cursor: "pointer", fontSize: 11, fontWeight: 600 }}
-                    >📱 WhatsApp</button>
-                    <button onClick={(e) => { e.stopPropagation(); onEdit(p); }}
-                      style={{ background: `${C.primary}15`, color: C.primary, border: `1px solid ${C.primary}40`, padding: "6px 10px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 600 }}
-                    >✏️ Editar</button>
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      {/* MOBILE: tarjetas */}
+      {isMobile ? (
+        <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+          {filtered.length === 0 && (
+            <div style={{ padding: 24, textAlign: "center", color: C.textDim, fontSize: 13 }}>
+              {search ? `Sin resultados para "${search}"` : "Sin pacientes aún."}
+            </div>
+          )}
+          {filtered.map(p => {
+            const dias = p.fecha_ultima_visita
+              ? Math.floor((Date.now() - new Date(p.fecha_ultima_visita).getTime()) / (1000 * 60 * 60 * 24))
+              : null;
+            const estado = dias === null ? "sin_datos" : dias > 365 ? "vencida" : dias > 335 ? "proxima" : "vigente";
+            const estadoColor = estado === "vencida" ? C.red : estado === "proxima" ? C.amber : estado === "vigente" ? C.green : C.textMuted;
+            const estadoLabel = estado === "vencida" ? `Vencida (${dias}d)` : estado === "proxima" ? `Próx. (${365 - dias}d)` : estado === "vigente" ? "Vigente" : "Sin receta";
+            return (
+              <div key={p.id} onClick={() => onEdit(p)} style={{
+                background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: "12px 14px", cursor: "pointer",
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
+                  <div>
+                    <div style={{ fontWeight: 700, color: C.text, fontSize: 14 }}>{p.nombre || "Sin nombre"}</div>
+                    <div style={{ fontSize: 11, color: C.textDim, marginTop: 2 }}>RUT: {p.rut || "—"} · {p.telefono || "sin tel."}</div>
+                  </div>
+                  <Pill label={estadoLabel} color={estadoColor} />
+                </div>
+                <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                  <button onClick={(e) => { e.stopPropagation(); handleSendWhatsApp(p); }}
+                    style={{ flex: 1, background: "rgba(37,211,102,0.15)", border: "1px solid #25D36640", color: "#25D366", borderRadius: 6, padding: "7px", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
+                    📱 WhatsApp
+                  </button>
+                  <button onClick={(e) => { e.stopPropagation(); onEdit(p); }}
+                    style={{ flex: 1, background: `${C.primary}15`, color: C.primary, border: `1px solid ${C.primary}40`, padding: "7px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
+                    ✏️ Editar
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      ) : (
+        /* DESKTOP: tabla completa */
+        <div style={{ overflowX: "auto" }}>
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <thead>
+              <tr style={{ background: `${C.surfaceL}80` }}>
+                {["Paciente", "Contacto", "Receta", "Estado", "Acciones"].map(h => (
+                  <th key={h} style={{ padding: "12px 16px", fontSize: 11, color: C.textMuted, fontWeight: 600, textTransform: "uppercase", textAlign: "left" }}>{h}</th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {filtered.length === 0 && (
+                <tr><td colSpan="5" style={{ padding: "40px", textAlign: "center", color: C.textDim, fontSize: 13 }}>
+                  {search ? `Sin resultados para "${search}"` : "Aún no hay pacientes. Agrega el primero arriba o captúralos automáticamente desde WhatsApp."}
+                </td></tr>
+              )}
+              {filtered.map(p => {
+                const dias = p.fecha_ultima_visita
+                  ? Math.floor((Date.now() - new Date(p.fecha_ultima_visita).getTime()) / (1000 * 60 * 60 * 24))
+                  : null;
+                const estado = dias === null ? "sin_datos" : dias > 365 ? "vencida" : dias > 335 ? "proxima" : "vigente";
+                const estadoColor = estado === "vencida" ? C.red : estado === "proxima" ? C.amber : estado === "vigente" ? C.green : C.textMuted;
+                const estadoLabel = estado === "vencida" ? `Vencida (${dias}d)` : estado === "proxima" ? `Próxima (${365 - dias}d)` : estado === "vigente" ? "Vigente" : "Sin receta";
+                return (
+                  <tr key={p.id} style={{ borderBottom: `1px solid ${C.border}`, cursor: "pointer" }}
+                    onClick={() => onEdit(p)}
+                    onMouseEnter={e => e.currentTarget.style.background = `${C.surfaceL}40`}
+                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+                  >
+                    <td style={{ padding: "12px 16px" }}>
+                      <div style={{ fontWeight: 600, color: C.text, fontSize: 14 }}>{p.nombre || "Sin nombre"}</div>
+                      <div style={{ fontSize: 11, color: C.textDim, marginTop: 2 }}>RUT: {p.rut || "—"}</div>
+                    </td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <div style={{ fontSize: 13, color: C.text }}>{p.telefono || "—"}</div>
+                      <div style={{ fontSize: 11, color: C.textDim, marginTop: 2 }}>Visita: {p.fecha_ultima_visita || "—"}</div>
+                    </td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <Pill label={estadoLabel} color={estadoColor} />
+                    </td>
+                    <td style={{ padding: "12px 16px" }}>
+                      <Pill
+                        label={p.estado_compra || "Pendiente"}
+                        color={p.estado_compra === "Compró" ? C.green : p.estado_compra === "No Compró" ? C.red : C.textMuted}
+                      />
+                      {p.monto_venta && <div style={{ fontSize: 11, color: C.green, fontWeight: 700, marginTop: 2 }}>${Number(p.monto_venta).toLocaleString("es-CL")}</div>}
+                    </td>
+                    <td style={{ padding: "12px 16px", display: "flex", gap: 8 }}>
+                      <button onClick={(e) => { e.stopPropagation(); handleSendWhatsApp(p); }}
+                        style={{ background: "rgba(37, 211, 102, 0.15)", border: "1px solid #25D36640", color: "#25D366", borderRadius: 6, padding: "6px 10px", cursor: "pointer", fontSize: 11, fontWeight: 600 }}
+                      >📱 WhatsApp</button>
+                      <button onClick={(e) => { e.stopPropagation(); onEdit(p); }}
+                        style={{ background: `${C.primary}15`, color: C.primary, border: `1px solid ${C.primary}40`, padding: "6px 10px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 600 }}
+                      >✏️ Editar</button>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
     </Card>
   );
 }
@@ -456,9 +499,10 @@ function CitaModal({ opticaId, pacientes, onClose, refresh }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// TAB: CITAS
+// TAB: CITAS — tabla en desktop, tarjetas en mobile
 // ─────────────────────────────────────────────────────────────
 function TabCitas({ citas, refresh, optica, pacientes }) {
+  const { isMobile } = useViewport();
   const [showModal, setShowModal] = useState(false);
 
   const updateCita = async (id, estado) => {
@@ -466,86 +510,157 @@ function TabCitas({ citas, refresh, optica, pacientes }) {
     refresh();
   };
 
+  const pendientes = citas.filter(c => c.estado === "pendiente_confirmacion").length;
+
   return (
     <>
       <Card style={{ padding: 0 }}>
-        <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <div style={{
+          padding: "16px 20px", borderBottom: `1px solid ${C.border}`,
+          display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10,
+        }}>
           <div>
             <div style={{ fontSize: 16, fontWeight: 600, color: C.text }}>Agenda de Citas</div>
             <div style={{ fontSize: 12, color: C.textDim, marginTop: 2 }}>
-              {citas.filter(c => c.estado === "pendiente_confirmacion").length} pendientes de confirmar
+              {pendientes > 0
+                ? <span style={{ color: C.amber, fontWeight: 600 }}>⏳ {pendientes} pendientes de confirmar</span>
+                : `${citas.length} citas totales`}
             </div>
           </div>
-          <button onClick={() => setShowModal(true)} style={{
-            background: C.primary, color: "#000", border: "none", borderRadius: 6,
-            padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer",
-          }}>+ Nueva Cita</button>
+          <button
+            onClick={() => setShowModal(true)}
+            style={{ background: C.primary, color: "#000", border: "none", borderRadius: 6, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
+          >
+            + Nueva Cita
+          </button>
         </div>
-        <div style={{ overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ background: `${C.surfaceL}80` }}>
-                {["Paciente", "Servicio", "Fecha y hora", "Origen", "Estado", "Acciones"].map(h => (
-                  <th key={h} style={{ padding: "12px 16px", fontSize: 11, color: C.textMuted, fontWeight: 600, textTransform: "uppercase", textAlign: "left" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {citas.length === 0 && (
-                <tr><td colSpan="6" style={{ padding: 32, textAlign: "center", color: C.textDim, fontSize: 13 }}>
-                  No hay citas agendadas. Usa "+ Nueva Cita" para agregar una manualmente.
-                </td></tr>
-              )}
-              {citas.map(c => {
-                const estadoColor = c.estado === "confirmada" ? C.green
-                  : c.estado === "cancelada" ? C.red
-                  : c.estado === "completada" ? C.blue
-                  : C.amber;
-                const isBot = c.origen === "bot-ia";
-                const origenColor = isBot ? "#A78BFA" : C.blue;
-                const origenLabel = isBot ? "🤖 IA" : (c.origen || "manual");
 
-                // Generar Google Calendar link al vuelo
-                const calLink = c.fecha ? buildCalLinkForCita(c, optica) : null;
-
-                return (
-                  <tr key={c.id} style={{
-                    borderBottom: `1px solid ${C.border}`,
-                    background: isBot ? "rgba(167,139,250,0.04)" : "transparent",
-                  }}>
-                    <td style={{ padding: "12px 16px" }}>
-                      <div style={{ fontWeight: 600, color: C.text, fontSize: 13 }}>{c.nombre || `Paciente #${c.paciente_id}`}</div>
-                      {c.telefono && <div style={{ fontSize: 11, color: C.textDim }}>{c.telefono}</div>}
-                    </td>
-                    <td style={{ padding: "12px 16px", fontSize: 13, color: C.text }}>{c.servicio || "—"}</td>
-                    <td style={{ padding: "12px 16px", fontSize: 13, color: C.text }}>{c.fecha} {c.hora && `· ${c.hora}`}</td>
-                    <td style={{ padding: "12px 16px" }}><Pill label={origenLabel} color={origenColor} /></td>
-                    <td style={{ padding: "12px 16px" }}><Pill label={c.estado} color={estadoColor} /></td>
-                    <td style={{ padding: "12px 16px", display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      {calLink && (
-                        <a href={calLink} target="_blank" rel="noopener noreferrer"
-                          title="Agregar a Google Calendar"
-                          style={{ background: "rgba(66,133,244,0.15)", color: "#7DD3FC", border: "1px solid rgba(66,133,244,0.4)", padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11, fontWeight: 600, textDecoration: "none" }}>
-                          📅 Calendar
-                        </a>
-                      )}
-                      {c.estado === "pendiente_confirmacion" && (
-                        <button onClick={() => updateCita(c.id, "confirmada")}
-                          style={{ background: `${C.green}20`, color: C.green, border: `1px solid ${C.green}40`, padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11, fontWeight: 600 }}>
-                          ✓ Confirmar
-                        </button>
-                      )}
+        {/* MOBILE: tarjetas */}
+        {isMobile ? (
+          <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
+            {citas.length === 0 && (
+              <div style={{ padding: 24, textAlign: "center", color: C.textDim, fontSize: 13 }}>
+                No hay citas. Usa "+ Nueva Cita" para agregar.
+              </div>
+            )}
+            {citas.map(c => {
+              const estadoColor = c.estado === "confirmada" ? C.green
+                : c.estado === "cancelada" ? C.red
+                : c.estado === "completada" ? C.blue : C.amber;
+              const isBot = c.origen === "bot-ia";
+              const calLink = c.fecha ? buildCalLinkForCita(c, optica) : null;
+              return (
+                <div key={c.id} style={{
+                  background: C.bg,
+                  border: `1px solid ${isBot ? "#A78BFA40" : C.border}`,
+                  borderLeft: `3px solid ${estadoColor}`,
+                  borderRadius: 10, padding: "12px 14px",
+                }}>
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                    <div>
+                      <div style={{ fontWeight: 700, color: C.text, fontSize: 14 }}>{c.nombre || "—"}</div>
+                      <div style={{ fontSize: 12, color: C.textDim, marginTop: 2 }}>{c.servicio || "—"}</div>
+                    </div>
+                    <div style={{ textAlign: "right", flexShrink: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{c.fecha || "—"}</div>
+                      {c.hora && <div style={{ fontSize: 12, color: C.textDim }}>{c.hora}</div>}
+                    </div>
+                  </div>
+                  <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
+                    <Pill label={c.estado} color={estadoColor} />
+                    {isBot && <Pill label="🤖 IA" color="#A78BFA" />}
+                    {calLink && (
+                      <a href={calLink} target="_blank" rel="noopener noreferrer"
+                        style={{ fontSize: 11, color: "#7DD3FC", textDecoration: "none", fontWeight: 700, background: "rgba(66,133,244,0.15)", padding: "4px 10px", borderRadius: 4, border: "1px solid rgba(66,133,244,0.4)" }}>
+                        📅 Google Calendar
+                      </a>
+                    )}
+                    {c.estado === "pendiente_confirmacion" && (
+                      <button onClick={() => updateCita(c.id, "confirmada")}
+                        style={{ background: `${C.green}20`, color: C.green, border: `1px solid ${C.green}40`, padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>
+                        ✓ Confirmar
+                      </button>
+                    )}
+                    {c.estado !== "cancelada" && (
                       <button onClick={() => updateCita(c.id, "cancelada")}
-                        style={{ background: `${C.red}20`, color: C.red, border: `1px solid ${C.red}40`, padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11, fontWeight: 600 }}>
+                        style={{ background: `${C.red}15`, color: C.red, border: `1px solid ${C.red}30`, padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11 }}>
                         Cancelar
                       </button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
+                    )}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        ) : (
+          /* DESKTOP: tabla completa */
+          <div style={{ overflowX: "auto" }}>
+            <table style={{ width: "100%", borderCollapse: "collapse" }}>
+              <thead>
+                <tr style={{ background: `${C.surfaceL}80` }}>
+                  {["Paciente", "Servicio", "Fecha y hora", "Origen", "Estado", "Acciones"].map(h => (
+                    <th key={h} style={{ padding: "12px 16px", fontSize: 11, color: C.textMuted, fontWeight: 600, textTransform: "uppercase", textAlign: "left" }}>{h}</th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {citas.length === 0 && (
+                  <tr><td colSpan="6" style={{ padding: 32, textAlign: "center", color: C.textDim, fontSize: 13 }}>
+                    No hay citas agendadas. Usa "+ Nueva Cita" para agregar una manualmente.
+                  </td></tr>
+                )}
+                {citas.map(c => {
+                  const estadoColor = c.estado === "confirmada" ? C.green
+                    : c.estado === "cancelada" ? C.red
+                    : c.estado === "completada" ? C.blue : C.amber;
+                  const isBot = c.origen === "bot-ia";
+                  const origenColor = isBot ? "#A78BFA" : C.blue;
+                  const origenLabel = isBot ? "🤖 IA" : (c.origen || "manual");
+                  const calLink = c.fecha ? buildCalLinkForCita(c, optica) : null;
+
+                  return (
+                    <tr key={c.id} style={{
+                      borderBottom: `1px solid ${C.border}`,
+                      background: isBot ? "rgba(167,139,250,0.04)" : "transparent",
+                    }}>
+                      <td style={{ padding: "12px 16px" }}>
+                        <div style={{ fontWeight: 600, color: C.text, fontSize: 13 }}>{c.nombre || `Paciente #${c.paciente_id}`}</div>
+                        {c.telefono && <div style={{ fontSize: 11, color: C.textDim }}>{c.telefono}</div>}
+                      </td>
+                      <td style={{ padding: "12px 16px", fontSize: 13, color: C.text }}>{c.servicio || "—"}</td>
+                      <td style={{ padding: "12px 16px", fontSize: 13, color: C.text }}>{c.fecha} {c.hora && `· ${c.hora}`}</td>
+                      <td style={{ padding: "12px 16px" }}><Pill label={origenLabel} color={origenColor} /></td>
+                      <td style={{ padding: "12px 16px" }}><Pill label={c.estado} color={estadoColor} /></td>
+                      <td style={{ padding: "12px 16px" }}>
+                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+                          {calLink && (
+                            <a href={calLink} target="_blank" rel="noopener noreferrer"
+                              title="Agregar a Google Calendar"
+                              style={{ background: "rgba(66,133,244,0.15)", color: "#7DD3FC", border: "1px solid rgba(66,133,244,0.4)", padding: "5px 10px", borderRadius: 4, fontSize: 11, fontWeight: 700, textDecoration: "none" }}>
+                              📅 Calendar
+                            </a>
+                          )}
+                          {c.estado === "pendiente_confirmacion" && (
+                            <button onClick={() => updateCita(c.id, "confirmada")}
+                              style={{ background: `${C.green}20`, color: C.green, border: `1px solid ${C.green}40`, padding: "5px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>
+                              ✓ Confirmar
+                            </button>
+                          )}
+                          {c.estado !== "cancelada" && (
+                            <button onClick={() => updateCita(c.id, "cancelada")}
+                              style={{ background: `${C.red}20`, color: C.red, border: `1px solid ${C.red}40`, padding: "5px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11 }}>
+                              Cancelar
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Card>
       {showModal && (
         <CitaModal
@@ -560,46 +675,85 @@ function TabCitas({ citas, refresh, optica, pacientes }) {
 }
 
 // ─────────────────────────────────────────────────────────────
-// TAB: CONFIGURACIÓN
+// TAB: CONFIGURACIÓN — con dirty-state para no perder cambios
 // ─────────────────────────────────────────────────────────────
 function TabConfiguracion({ optica, refresh }) {
   const [edit, setEdit] = useState(optica);
+  const [dirty, setDirty] = useState(false);   // true = hay cambios sin guardar
   const [saving, setSaving] = useState(false);
   const [saved, setSaved] = useState(false);
+  const [saveError, setSaveError] = useState(null);
 
-  useEffect(() => { setEdit(optica); }, [optica]);
+  // Solo sincronizar desde la BD si el usuario NO está editando activamente
+  // Esto evita el bug donde refresh() pisaba los cambios del usuario
+  useEffect(() => {
+    if (!dirty) setEdit(optica);
+  }, [optica, dirty]);
+
+  const upd = (field, value) => {
+    setEdit(prev => ({ ...prev, [field]: value }));
+    setDirty(true);
+    setSaved(false);
+  };
 
   const save = async () => {
     setSaving(true);
+    setSaveError(null);
+
+    // Asegurarse de que servicios/escalar_si sean arrays JSON válidos
+    const serviciosClean = Array.isArray(edit.servicios)
+      ? edit.servicios.filter(s => s && (s.nombre || s.precio))
+      : [];
+    const escalarSiClean = Array.isArray(edit.escalar_si)
+      ? edit.escalar_si.filter(Boolean)
+      : [];
+
+    const payload = {
+      nombre:              edit.nombre            || "",
+      slogan:              edit.slogan            || "",
+      direccion:           edit.direccion         || "",
+      ciudad:              edit.ciudad            || "",
+      telefono:            edit.telefono          || "",
+      whatsapp:            edit.whatsapp          || "",
+      horario:             edit.horario           || "",
+      numero_escalada:     edit.numero_escalada   || "",
+      bot_nombre:          edit.bot_nombre        || "Aukén",
+      promocion_estrella:  edit.promocion_estrella|| "",
+      servicios:           serviciosClean,
+      escalar_si:          escalarSiClean,
+    };
+
     const { error } = await supabase
       .from("opticas")
-      .update({
-        nombre: edit.nombre, slogan: edit.slogan,
-        direccion: edit.direccion, ciudad: edit.ciudad,
-        telefono: edit.telefono, whatsapp: edit.whatsapp,
-        horario: edit.horario, numero_escalada: edit.numero_escalada,
-        bot_nombre: edit.bot_nombre,
-        promocion_estrella: edit.promocion_estrella,
-        servicios: edit.servicios, escalar_si: edit.escalar_si,
-      })
+      .update(payload)
       .eq("id", optica.id);
+
     setSaving(false);
     if (!error) {
       setSaved(true);
+      setDirty(false);   // ← limpia dirty ANTES de refresh para que el useEffect pueda sincronizar
       refresh();
-      setTimeout(() => setSaved(false), 2500);
+      setTimeout(() => setSaved(false), 3000);
     } else {
-      alert("Error al guardar: " + error.message);
+      console.error("[config] Error guardando:", error);
+      setSaveError(error.message);
     }
   };
 
   const updateServicio = (idx, key, value) => {
-    const newServicios = [...(edit.servicios || [])];
-    newServicios[idx] = { ...newServicios[idx], [key]: value };
-    setEdit({ ...edit, servicios: newServicios });
+    const arr = [...(edit.servicios || [])];
+    arr[idx] = { ...arr[idx], [key]: value };
+    setEdit(prev => ({ ...prev, servicios: arr }));
+    setDirty(true);
   };
-  const addServicio = () => setEdit({ ...edit, servicios: [...(edit.servicios || []), { nombre: "", precio: "" }] });
-  const removeServicio = (idx) => setEdit({ ...edit, servicios: edit.servicios.filter((_, i) => i !== idx) });
+  const addServicio = () => {
+    setEdit(prev => ({ ...prev, servicios: [...(prev.servicios || []), { nombre: "", precio: "" }] }));
+    setDirty(true);
+  };
+  const removeServicio = (idx) => {
+    setEdit(prev => ({ ...prev, servicios: (prev.servicios || []).filter((_, i) => i !== idx) }));
+    setDirty(true);
+  };
 
   const Field = ({ label, value, onChange, ph }) => (
     <div>
@@ -612,65 +766,103 @@ function TabConfiguracion({ optica, refresh }) {
   return (
     <Card>
       <div style={{ marginBottom: 24 }}>
-        <h3 style={{ fontSize: 18, fontWeight: 700, color: C.text, marginBottom: 6 }}>⚙️ Configuración de la Óptica</h3>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 6 }}>
+          <h3 style={{ fontSize: 18, fontWeight: 700, color: C.text }}>⚙️ Configuración de la Óptica</h3>
+          {dirty && (
+            <span style={{ fontSize: 11, color: C.amber, fontWeight: 700, background: `${C.amber}15`, border: `1px solid ${C.amber}40`, padding: "3px 10px", borderRadius: 12 }}>
+              ● Cambios sin guardar
+            </span>
+          )}
+        </div>
         <p style={{ fontSize: 13, color: C.textDim }}>Estos datos los usa el bot Aukén automáticamente en cada conversación.</p>
       </div>
 
       <div style={{ display: "grid", gap: 16 }}>
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-          <Field label="Nombre comercial" value={edit.nombre} onChange={v => setEdit({ ...edit, nombre: v })} ph="Óptica Glow Vision" />
-          <Field label="Slogan" value={edit.slogan} onChange={v => setEdit({ ...edit, slogan: v })} ph="calidad que inspira" />
+          <Field label="Nombre comercial" value={edit.nombre} onChange={v => upd("nombre", v)} ph="Óptica Glow Vision" />
+          <Field label="Slogan" value={edit.slogan} onChange={v => upd("slogan", v)} ph="calidad que inspira" />
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-          <Field label="Dirección" value={edit.direccion} onChange={v => setEdit({ ...edit, direccion: v })} ph="Caupolicán #763" />
-          <Field label="Ciudad" value={edit.ciudad} onChange={v => setEdit({ ...edit, ciudad: v })} ph="Punitaqui" />
+          <Field label="Dirección" value={edit.direccion} onChange={v => upd("direccion", v)} ph="Caupolicán #763" />
+          <Field label="Ciudad" value={edit.ciudad} onChange={v => upd("ciudad", v)} ph="Punitaqui" />
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
-          <Field label="Teléfono general" value={edit.telefono} onChange={v => setEdit({ ...edit, telefono: v })} ph="+56 9 5493 2802" />
-          <Field label="WhatsApp escalada (dueño)" value={edit.numero_escalada} onChange={v => setEdit({ ...edit, numero_escalada: v })} ph="+56954932802" />
+          <Field label="Teléfono general" value={edit.telefono} onChange={v => upd("telefono", v)} ph="+56 9 5493 2802" />
+          <Field label="WhatsApp escalada (dueño)" value={edit.numero_escalada} onChange={v => upd("numero_escalada", v)} ph="+56954932802" />
         </div>
 
-        <Field label="Horario de atención" value={edit.horario} onChange={v => setEdit({ ...edit, horario: v })} ph="Lunes a Viernes 11:30 a 18:30" />
-
-        <Field label="Promoción estrella" value={edit.promocion_estrella} onChange={v => setEdit({ ...edit, promocion_estrella: v })} ph="Examen visual GRATIS al comprar tus lentes" />
-
-        <Field label="Nombre del bot" value={edit.bot_nombre} onChange={v => setEdit({ ...edit, bot_nombre: v })} ph="Aukén" />
+        <Field label="Horario de atención" value={edit.horario} onChange={v => upd("horario", v)} ph="Lunes a Viernes 11:30 a 18:30" />
+        <Field label="Promoción estrella" value={edit.promocion_estrella} onChange={v => upd("promocion_estrella", v)} ph="Examen visual GRATIS al comprar tus lentes" />
+        <Field label="Nombre del bot" value={edit.bot_nombre} onChange={v => upd("bot_nombre", v)} ph="Aukén" />
 
         {/* SERVICIOS */}
         <div>
           <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: C.textDim, textTransform: "uppercase", marginBottom: 8, letterSpacing: "0.05em" }}>
-            Servicios y precios
+            Servicios y precios ({(edit.servicios || []).length})
           </label>
           <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+            {(edit.servicios || []).length === 0 && (
+              <div style={{ color: C.textMuted, fontSize: 12, textAlign: "center", padding: "8px 0" }}>
+                Sin servicios. Agrega el primero con el botón de abajo.
+              </div>
+            )}
             {(edit.servicios || []).map((s, i) => (
-              <div key={i} style={{ display: "flex", gap: 8 }}>
-                <input value={s.nombre || ""} onChange={(e) => updateServicio(i, "nombre", e.target.value)} placeholder="Nombre del servicio"
-                  style={{ flex: 2, background: C.surfaceL, border: `1px solid ${C.border}`, color: C.text, padding: "8px 12px", borderRadius: 6, fontSize: 12, outline: "none" }} />
-                <input value={s.precio || ""} onChange={(e) => updateServicio(i, "precio", e.target.value)} placeholder="$45.000"
-                  style={{ flex: 1, background: C.surfaceL, border: `1px solid ${C.border}`, color: C.text, padding: "8px 12px", borderRadius: 6, fontSize: 12, outline: "none" }} />
-                <button onClick={() => removeServicio(i)}
-                  style={{ background: `${C.red}20`, color: C.red, border: `1px solid ${C.red}40`, padding: "0 12px", borderRadius: 6, cursor: "pointer", fontSize: 14 }}>×</button>
+              <div key={i} style={{ display: "flex", gap: 8, alignItems: "center" }}>
+                <input
+                  value={s.nombre || ""}
+                  onChange={(e) => updateServicio(i, "nombre", e.target.value)}
+                  placeholder="Nombre del servicio"
+                  style={{ flex: 2, background: C.surfaceL, border: `1px solid ${C.border}`, color: C.text, padding: "8px 12px", borderRadius: 6, fontSize: 12, outline: "none", minWidth: 0 }}
+                />
+                <input
+                  value={s.precio || ""}
+                  onChange={(e) => updateServicio(i, "precio", e.target.value)}
+                  placeholder="$45.000"
+                  style={{ flex: 1, background: C.surfaceL, border: `1px solid ${C.border}`, color: C.text, padding: "8px 12px", borderRadius: 6, fontSize: 12, outline: "none", minWidth: 0 }}
+                />
+                <button
+                  onClick={() => removeServicio(i)}
+                  title="Eliminar servicio"
+                  style={{ background: `${C.red}20`, color: C.red, border: `1px solid ${C.red}40`, width: 32, height: 32, borderRadius: 6, cursor: "pointer", fontSize: 16, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
+                >×</button>
               </div>
             ))}
-            <button onClick={addServicio}
-              style={{ background: `${C.primary}15`, color: C.primary, border: `1px dashed ${C.primary}50`, padding: "8px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600 }}>
+            <button
+              onClick={addServicio}
+              style={{ background: `${C.primary}15`, color: C.primary, border: `1px dashed ${C.primary}50`, padding: "9px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600, marginTop: 2 }}
+            >
               + Agregar servicio
             </button>
           </div>
         </div>
 
+        {/* ERROR */}
+        {saveError && (
+          <div style={{ background: `${C.red}15`, border: `1px solid ${C.red}40`, borderRadius: 8, padding: "10px 14px", fontSize: 12, color: C.red }}>
+            ⚠️ Error al guardar: {saveError}
+            <br /><span style={{ color: C.textDim, fontSize: 11 }}>
+              Si el error menciona una columna, ejecuta la migración 007 en Supabase SQL Editor.
+            </span>
+          </div>
+        )}
+
         {/* GUARDAR */}
         <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
-          <button onClick={save} disabled={saving}
+          <button
+            onClick={save}
+            disabled={saving || !dirty}
             style={{
-              background: saved ? C.green : C.primary, color: "#000",
+              background: saved ? C.green : dirty ? C.primary : `${C.primary}50`,
+              color: "#000",
               border: "none", borderRadius: 8, padding: "12px 28px",
-              fontSize: 14, fontWeight: 700, cursor: saving ? "default" : "pointer",
+              fontSize: 14, fontWeight: 700,
+              cursor: (saving || !dirty) ? "default" : "pointer",
               opacity: saving ? 0.6 : 1, transition: "all .2s",
-            }}>
-            {saving ? "Guardando..." : saved ? "✓ Guardado" : "💾 Guardar cambios"}
+            }}
+          >
+            {saving ? "Guardando..." : saved ? "✓ Guardado" : dirty ? "💾 Guardar cambios" : "Sin cambios"}
           </button>
         </div>
       </div>
@@ -895,6 +1087,227 @@ function PatientModal({ patient, opticaId, onClose, refresh }) {
   );
 }
 
+// ─────────────────────────────────────────────────────────────
+// TAB: EN VIVO — Chat + Citas simultáneos en tiempo real
+// ─────────────────────────────────────────────────────────────
+function TabEnVivo({ citas, optica }) {
+  const { isMobile } = useViewport();
+  const [mensajes, setMensajes] = useState([]);
+  const [loadingMsgs, setLoadingMsgs] = useState(true);
+  const msgEndRef = useRef(null);
+
+  const loadMensajes = useCallback(async () => {
+    const { data } = await supabase
+      .from("mensajes_chat")
+      .select("*")
+      .order("created_at", { ascending: false })
+      .limit(40);
+    setMensajes((data || []).reverse());
+    setLoadingMsgs(false);
+  }, []);
+
+  useEffect(() => {
+    loadMensajes();
+    const sub = supabase.channel("enlive_mensajes_tab")
+      .on("postgres_changes", { event: "INSERT", schema: "public", table: "mensajes_chat" }, () => {
+        loadMensajes();
+        setTimeout(() => msgEndRef.current?.scrollIntoView({ behavior: "smooth" }), 150);
+      })
+      .subscribe();
+    return () => supabase.removeChannel(sub);
+  }, [loadMensajes]);
+
+  // Scroll al último mensaje cuando cargan
+  useEffect(() => {
+    if (!loadingMsgs) {
+      setTimeout(() => msgEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+    }
+  }, [loadingMsgs]);
+
+  const today = new Date().toISOString().split("T")[0];
+  const citasProximas = [...citas]
+    .filter(c => c.fecha >= today && c.estado !== "cancelada")
+    .sort((a, b) => `${a.fecha}${a.hora || ""}`.localeCompare(`${b.fecha}${b.hora || ""}`))
+    .slice(0, 15);
+
+  return (
+    <div style={{
+      display: "grid",
+      gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr",
+      gap: 16,
+      alignItems: "start",
+    }}>
+      {/* ── Panel izquierdo: Chat en vivo ── */}
+      <Card accent={C.primary} style={{ padding: 0 }}>
+        <div style={{
+          padding: "14px 18px", borderBottom: `1px solid ${C.border}`,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{
+              width: 8, height: 8, borderRadius: "50%",
+              background: C.green, boxShadow: `0 0 6px ${C.green}`,
+              display: "inline-block", animation: "pulse 2s infinite",
+            }} />
+            <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }`}</style>
+            <span style={{ fontWeight: 700, fontSize: 14, color: C.text }}>💬 Chat en vivo</span>
+            <span style={{ fontSize: 11, color: C.textMuted }}>({mensajes.length})</span>
+          </div>
+          <button
+            onClick={() => window.location.assign("/optica")}
+            style={{ fontSize: 11, color: C.primary, fontWeight: 700, background: `${C.primary}15`, border: `1px solid ${C.primary}40`, borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}
+          >
+            Abrir monitor →
+          </button>
+        </div>
+
+        <div style={{
+          height: isMobile ? 300 : 440, overflowY: "auto",
+          padding: "12px 14px", display: "flex", flexDirection: "column", gap: 6,
+          scrollbarWidth: "thin",
+        }}>
+          {loadingMsgs && (
+            <div style={{ color: C.textMuted, fontSize: 12, textAlign: "center", padding: 24 }}>Cargando mensajes...</div>
+          )}
+          {!loadingMsgs && mensajes.length === 0 && (
+            <div style={{ color: C.textMuted, fontSize: 12, textAlign: "center", padding: 24 }}>
+              Sin mensajes aún.<br />
+              <span style={{ fontSize: 11 }}>Los mensajes del bot y pacientes aparecerán aquí en tiempo real.</span>
+            </div>
+          )}
+          {mensajes.map((m, i) => {
+            const isBot = m.remitente === "bot";
+            const isCliente = m.remitente === "cliente";
+            return (
+              <div key={m.id || i} style={{
+                display: "flex",
+                justifyContent: isBot ? "flex-end" : "flex-start",
+              }}>
+                <div style={{
+                  maxWidth: "82%",
+                  background: isBot ? `${C.primary}18` : isCliente ? C.surfaceL : `${C.blue}15`,
+                  border: `1px solid ${isBot ? C.primary + "35" : C.border}`,
+                  borderRadius: isBot ? "12px 12px 3px 12px" : "12px 12px 12px 3px",
+                  padding: "7px 12px",
+                  fontSize: 12,
+                  color: C.text,
+                }}>
+                  {!isBot && (
+                    <div style={{ fontSize: 10, color: isCliente ? C.primary : C.blue, marginBottom: 3, fontWeight: 700, textTransform: "uppercase" }}>
+                      {m.remitente}
+                    </div>
+                  )}
+                  <div style={{ lineHeight: 1.5, wordBreak: "break-word" }}>{m.contenido}</div>
+                  <div style={{ fontSize: 9, color: C.textMuted, marginTop: 3, textAlign: isBot ? "right" : "left" }}>
+                    {m.created_at
+                      ? new Date(m.created_at).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })
+                      : ""}
+                  </div>
+                </div>
+              </div>
+            );
+          })}
+          <div ref={msgEndRef} />
+        </div>
+      </Card>
+
+      {/* ── Panel derecho: Citas próximas ── */}
+      <Card accent={C.blue} style={{ padding: 0 }}>
+        <div style={{
+          padding: "14px 18px", borderBottom: `1px solid ${C.border}`,
+          display: "flex", alignItems: "center", justifyContent: "space-between",
+        }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+            <span style={{
+              width: 8, height: 8, borderRadius: "50%",
+              background: C.blue, boxShadow: `0 0 6px ${C.blue}`,
+              display: "inline-block",
+            }} />
+            <span style={{ fontWeight: 700, fontSize: 14, color: C.text }}>📅 Citas próximas</span>
+          </div>
+          <span style={{ fontSize: 11, color: C.textDim, fontWeight: 600 }}>
+            {citasProximas.filter(c => c.fecha === today).length} hoy · {citasProximas.length} total
+          </span>
+        </div>
+
+        <div style={{ height: isMobile ? 300 : 440, overflowY: "auto", padding: "12px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
+          {citasProximas.length === 0 && (
+            <div style={{ color: C.textMuted, fontSize: 12, textAlign: "center", padding: 24 }}>
+              No hay citas próximas.<br />
+              <span style={{ fontSize: 11 }}>Las citas agendadas aparecerán aquí.</span>
+            </div>
+          )}
+          {citasProximas.map((c, i) => {
+            const isToday = c.fecha === today;
+            const estadoColor = c.estado === "confirmada" ? C.green
+              : c.estado === "cancelada" ? C.red
+              : c.estado === "completada" ? C.blue
+              : C.amber;
+            const isBot = c.origen === "bot-ia";
+            const calLink = buildCalLinkForCita(c, optica);
+
+            return (
+              <div key={c.id || i} style={{
+                background: isToday ? `${C.primary}10` : C.bg,
+                border: `1px solid ${isToday ? C.primary + "50" : C.border}`,
+                borderRadius: 10, padding: "10px 14px",
+                borderLeft: `3px solid ${isToday ? C.primary : estadoColor}`,
+              }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, color: C.text, fontSize: 13, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {c.nombre || "Paciente"}
+                    </div>
+                    <div style={{ fontSize: 11, color: C.textDim, marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {c.servicio || "—"}
+                    </div>
+                  </div>
+                  <div style={{ textAlign: "right", flexShrink: 0 }}>
+                    <div style={{
+                      fontSize: 12, fontWeight: 700,
+                      color: isToday ? C.primary : C.text,
+                      background: isToday ? `${C.primary}15` : "transparent",
+                      padding: isToday ? "2px 6px" : "0",
+                      borderRadius: 4,
+                    }}>
+                      {isToday ? "📍 HOY" : c.fecha}
+                    </div>
+                    {c.hora && (
+                      <div style={{ fontSize: 12, color: C.textDim, marginTop: 1, fontWeight: 600 }}>{c.hora}</div>
+                    )}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 6, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
+                  <Pill label={c.estado} color={estadoColor} />
+                  {isBot && <Pill label="🤖 IA" color="#A78BFA" />}
+                  {calLink && (
+                    <a
+                      href={calLink}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      style={{
+                        marginLeft: "auto",
+                        fontSize: 11, color: "#7DD3FC",
+                        textDecoration: "none", fontWeight: 700,
+                        background: "rgba(66,133,244,0.15)",
+                        padding: "3px 9px", borderRadius: 4,
+                        border: "1px solid rgba(66,133,244,0.4)",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      📅 Google Calendar
+                    </a>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </Card>
+    </div>
+  );
+}
+
 // =============================================================
 // COMPONENTE PRINCIPAL
 // =============================================================
@@ -1077,20 +1490,24 @@ export default function AukenOpticaDashboard() {
       </nav>
 
       {/* TABS */}
-      <div style={{ padding: isMobile ? "16px 12px 0" : "24px 32px 0", maxWidth: 1200, margin: "0 auto" }}>
+      <div style={{ padding: isMobile ? "12px 10px 24px" : "24px 32px 32px", maxWidth: 1200, margin: "0 auto" }}>
         <div style={{ display: "flex", gap: 6, borderBottom: `1px solid ${C.border}`, paddingBottom: 12, marginBottom: 16, overflowX: "auto", scrollbarWidth: "none" }}>
           {[
-            ["metricas", "📊 Métricas"],
-            ["pacientes", `👥 Pacientes (${pacientes.length})`],
-            ["citas", `📅 Citas (${citas.filter(c => c.estado === "pendiente_confirmacion").length})`],
-            ["config", "⚙️ Configuración"],
+            ["metricas",  "📊 Métricas"],
+            ["enlive",    isMobile ? "🔴 Vivo" : "🔴 En Vivo"],
+            ["pacientes", isMobile ? `👥 (${pacientes.length})` : `👥 Pacientes (${pacientes.length})`],
+            ["citas",     isMobile ? `📅 (${citas.filter(c => c.estado === "pendiente_confirmacion").length})` : `📅 Citas (${citas.filter(c => c.estado === "pendiente_confirmacion").length})`],
+            ["config",    isMobile ? "⚙️" : "⚙️ Configuración"],
           ].map(([id, label]) => (
             <button key={id} onClick={() => setTab(id)} style={{
               background: tab === id ? C.surfaceL : "transparent",
               color: tab === id ? C.text : C.textDim,
               border: tab === id ? `1px solid ${C.borderGlow}` : "1px solid transparent",
-              borderRadius: 8, padding: "8px 16px", fontSize: 13,
+              borderRadius: 8,
+              padding: isMobile ? "7px 12px" : "8px 16px",
+              fontSize: isMobile ? 12 : 13,
               fontWeight: tab === id ? 600 : 500, cursor: "pointer", transition: "all .2s",
+              whiteSpace: "nowrap",
             }}>
               {label}
             </button>
@@ -1098,6 +1515,7 @@ export default function AukenOpticaDashboard() {
         </div>
 
         {tab === "metricas" && <TabMetricas optica={optica} stats={stats} />}
+        {tab === "enlive"   && <TabEnVivo citas={citas} optica={optica} />}
         {tab === "pacientes" && (
           <TabPacientes
             optica={optica} pacientes={pacientes} refresh={refresh}
