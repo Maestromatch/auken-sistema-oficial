@@ -58,9 +58,13 @@ export default async function handler(req, res) {
     const systemPrompt = system || buildSystemPrompt(paciente, canal, null, opticaCfg);
 
     // ───── 4. Llamar a Claude ─────
+    // Limitar historial a los últimos 20 mensajes para controlar tokens
+    // (mantiene contexto útil sin enviar conversaciones completas de horas)
+    const historialLimitado = messages.slice(-20).map(m => ({ role: m.role, content: m.content }));
+
     const claude = await callClaude({
       system: systemPrompt,
-      messages: messages.map(m => ({ role: m.role, content: m.content })),
+      messages: historialLimitado,
       model: MODELS.CHAT,
       maxTokens: 800,
       temperature: 0.7,
@@ -209,6 +213,25 @@ async function executeWebAction(supabase, action, phone, paciente, opticaCfg) {
       console.warn("[chat] Fecha no parseable, ignorando book:", action.fecha);
       return null;
     }
+
+    // ── IDEMPOTENCIA: evitar citas duplicadas ──────────────────────────────
+    // Si en los últimos 3 minutos ya se creó una cita para el mismo
+    // paciente/fecha/hora, devolver esa misma sin insertar una nueva.
+    const ventanaIso = new Date(Date.now() - 3 * 60 * 1000).toISOString();
+    const { data: citaExistente } = await supabase
+      .from("citas")
+      .select("id, fecha, hora, servicio, estado")
+      .eq("paciente_id", paciente.id)
+      .eq("fecha", fechaISO)
+      .eq("hora", horaISO)
+      .gte("created_at", ventanaIso)
+      .maybeSingle();
+
+    if (citaExistente) {
+      console.log("[chat] Cita duplicada detectada, omitiendo insert:", citaExistente.id);
+      return { type: "booked", cita: citaExistente };
+    }
+    // ────────────────────────────────────────────────────────────────────────
 
     const { data: cita, error } = await supabase.from("citas").insert({
       paciente_id: paciente.id,

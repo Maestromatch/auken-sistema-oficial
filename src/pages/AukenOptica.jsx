@@ -215,10 +215,11 @@ function PatientPanel({ p, onClose, onGoToDashboard }) {
 
       {/* Acciones */}
       <div style={{ padding: "14px 16px", borderTop: `1px solid ${C.border}`, display: "flex", flexDirection: "column", gap: 7 }}>
-        <button onClick={onGoToDashboard} style={{
+        <a href="/optica/dashboard" style={{
           background: `${C.primary}15`, color: C.primary, border: `1px solid ${C.primary}35`,
           borderRadius: 8, padding: "8px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer",
-        }}>📋 Ver ficha completa</button>
+          textDecoration: "none", display: "block", textAlign: "center",
+        }}>📋 Ver ficha completa</a>
         {p.telefono && (
           <button onClick={() => window.open(`https://wa.me/${p.telefono.replace(/\D/g, "")}`, "_blank")} style={{
             background: "rgba(37,211,102,0.1)", color: "#25D366", border: "1px solid rgba(37,211,102,0.2)",
@@ -550,10 +551,11 @@ export default function AukenOptica() {
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <button onClick={() => { window.location.assign("/optica/dashboard"); }}
-            style={{ background: `${C.primary}15`, color: C.primary, border: `1px solid ${C.primary}30`, borderRadius: 6, padding: "5px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+          {/* <a href> es más confiable en mobile incógnito que window.location */}
+          <a href="/optica/dashboard"
+            style={{ background: `${C.primary}15`, color: C.primary, border: `1px solid ${C.primary}30`, borderRadius: 6, padding: "5px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer", textDecoration: "none", display: "inline-flex", alignItems: "center" }}>
             📊 Dashboard
-          </button>
+          </a>
           <button onClick={() => { localStorage.removeItem("auken_auth"); navigate("/login"); }}
             style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.inkFaint, borderRadius: 6, padding: "5px 10px", fontSize: 11, cursor: "pointer" }}>
             Salir
