@@ -507,12 +507,62 @@ export default function AukenOptica() {
 
   // ── Loading ──────────────────────────────────────────────────────────────────
   if (loading) return (
-    <div style={{ background: C.bg, color: C.ink, minHeight: "100vh", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", fontFamily: "'Inter', sans-serif" }}>
-      <div style={{ fontSize: 18, fontWeight: 700, letterSpacing: "0.15em", marginBottom: 20 }}>AUKÉN</div>
-      <div style={{ width: 100, height: 2, background: C.border, borderRadius: 2, overflow: "hidden", position: "relative" }}>
-        <div style={{ position: "absolute", width: "40%", height: "100%", background: C.primary, borderRadius: 2, animation: "ldg 1.2s infinite ease-in-out" }} />
+    <div style={{ background: C.bg, color: C.ink, minHeight: "100vh", display: "flex", flexDirection: "column", fontFamily: C.fontSans }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+        @keyframes auken-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+      `}</style>
+      <nav style={{
+        height: 48, borderBottom: `1px solid ${C.border}`, background: C.surface,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
+        padding: "0 20px", boxShadow: C.shadowSm,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <div style={{ width: 26, height: 26, borderRadius: C.radiusSm, background: `linear-gradient(90deg, ${C.surfaceL}, ${C.surfaceXL}, ${C.surfaceL})`, backgroundSize: "200% 100%", animation: "auken-shimmer 1.6s ease-in-out infinite" }} />
+          <div style={{ width: 92, height: 14, borderRadius: 4, background: `linear-gradient(90deg, ${C.surfaceL}, ${C.surfaceXL}, ${C.surfaceL})`, backgroundSize: "200% 100%", animation: "auken-shimmer 1.6s ease-in-out infinite" }} />
+        </div>
+        <div style={{ display: "flex", gap: 8 }}>
+          <div style={{ width: 74, height: 28, borderRadius: C.radius, background: `linear-gradient(90deg, ${C.surfaceL}, ${C.surfaceXL}, ${C.surfaceL})`, backgroundSize: "200% 100%", animation: "auken-shimmer 1.6s ease-in-out infinite" }} />
+          <div style={{ width: 54, height: 28, borderRadius: C.radius, background: `linear-gradient(90deg, ${C.surfaceL}, ${C.surfaceXL}, ${C.surfaceL})`, backgroundSize: "200% 100%", animation: "auken-shimmer 1.6s ease-in-out infinite" }} />
+        </div>
+      </nav>
+      <div style={{ flex: 1, display: "grid", gridTemplateColumns: isMobile ? "1fr" : "290px 1fr 270px", overflow: "hidden" }}>
+        {!isMobile && (
+          <aside style={{ borderRight: `1px solid ${C.border}`, background: C.surface, padding: 14, display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ width: "100%", height: 34, borderRadius: C.radius, background: `linear-gradient(90deg, ${C.surfaceL}, ${C.surfaceXL}, ${C.surfaceL})`, backgroundSize: "200% 100%", animation: "auken-shimmer 1.6s ease-in-out infinite" }} />
+            {Array.from({ length: 8 }).map((_, i) => (
+              <div key={i} style={{ display: "flex", gap: 10, padding: "8px 4px", alignItems: "center" }}>
+                <div style={{ width: 34, height: 34, borderRadius: "50%", background: `linear-gradient(90deg, ${C.surfaceL}, ${C.surfaceXL}, ${C.surfaceL})`, backgroundSize: "200% 100%", animation: "auken-shimmer 1.6s ease-in-out infinite" }} />
+                <div style={{ flex: 1 }}>
+                  <div style={{ width: "70%", height: 11, borderRadius: 4, background: `linear-gradient(90deg, ${C.surfaceL}, ${C.surfaceXL}, ${C.surfaceL})`, backgroundSize: "200% 100%", animation: "auken-shimmer 1.6s ease-in-out infinite" }} />
+                  <div style={{ width: "46%", height: 9, borderRadius: 4, marginTop: 7, background: `linear-gradient(90deg, ${C.surfaceL}, ${C.surfaceXL}, ${C.surfaceL})`, backgroundSize: "200% 100%", animation: "auken-shimmer 1.6s ease-in-out infinite" }} />
+                </div>
+              </div>
+            ))}
+          </aside>
+        )}
+        <main style={{ padding: 18, display: "flex", flexDirection: "column", gap: 12 }}>
+          {Array.from({ length: 5 }).map((_, i) => (
+            <div key={i} style={{
+              alignSelf: i % 2 ? "flex-end" : "flex-start",
+              width: isMobile ? (i % 2 ? "78%" : "68%") : (i % 2 ? "48%" : "38%"),
+              height: i === 0 ? 54 : 42,
+              borderRadius: i % 2 ? "12px 12px 3px 12px" : "12px 12px 12px 3px",
+              background: `linear-gradient(90deg, ${C.surfaceL}, ${C.surfaceXL}, ${C.surfaceL})`,
+              backgroundSize: "200% 100%",
+              animation: "auken-shimmer 1.6s ease-in-out infinite",
+            }} />
+          ))}
+        </main>
+        {!isMobile && (
+          <aside style={{ borderLeft: `1px solid ${C.border}`, background: C.surface, padding: 18, display: "flex", flexDirection: "column", gap: 12 }}>
+            <div style={{ width: 52, height: 52, borderRadius: "50%", alignSelf: "center", background: `linear-gradient(90deg, ${C.surfaceL}, ${C.surfaceXL}, ${C.surfaceL})`, backgroundSize: "200% 100%", animation: "auken-shimmer 1.6s ease-in-out infinite" }} />
+            {[72, 120, 96, 150, 84, 132].map((w, i) => (
+              <div key={i} style={{ width: w, height: 11, borderRadius: 4, background: `linear-gradient(90deg, ${C.surfaceL}, ${C.surfaceXL}, ${C.surfaceL})`, backgroundSize: "200% 100%", animation: "auken-shimmer 1.6s ease-in-out infinite" }} />
+            ))}
+          </aside>
+        )}
       </div>
-      <style>{`@keyframes ldg { 0%{left:-40%} 100%{left:140%} }`}</style>
     </div>
   );
 

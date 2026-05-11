@@ -202,6 +202,110 @@ function KPI({ label, value, color, sub, glow }) {
   return <KpiCard label={label} value={value} accent={color} sub={sub} glow={glow} series={makeSeries(value)} />;
 }
 
+// Skeleton loading — mantiene layout y evita la sensación de "pantalla esperando".
+function Skeleton({ w = "100%", h = 12, r = 4, style = {} }) {
+  return (
+    <div style={{
+      width: w,
+      height: h,
+      borderRadius: r,
+      background: `linear-gradient(90deg, ${C.surfaceL} 0%, ${C.surfaceH} 50%, ${C.surfaceL} 100%)`,
+      backgroundSize: "200% 100%",
+      animation: "auken-shimmer 1.6s ease-in-out infinite",
+      ...style,
+    }} />
+  );
+}
+
+function KpiSkeleton() {
+  return (
+    <div style={{
+      background: C.surface,
+      border: `1px solid ${C.border}`,
+      borderRadius: C.radiusLg,
+      padding: "16px 18px",
+      display: "flex",
+      flexDirection: "column",
+      gap: 12,
+      minHeight: 116,
+      boxShadow: C.shadow,
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+        <Skeleton w={90} h={10} />
+        <Skeleton w={38} h={18} r={C.radiusSm} />
+      </div>
+      <div style={{ display: "flex", alignItems: "flex-end", justifyContent: "space-between", gap: 12 }}>
+        <Skeleton w={110} h={28} r={C.radiusSm} />
+        <Skeleton w={64} h={24} r={4} />
+      </div>
+      <Skeleton w={70} h={10} />
+    </div>
+  );
+}
+
+function TableRowSkeleton({ cols = 5 }) {
+  return (
+    <tr style={{ borderBottom: `1px solid ${C.border}` }}>
+      {Array.from({ length: cols }).map((_, i) => (
+        <td key={i} style={{ padding: "14px 16px" }}>
+          <Skeleton w={i === 0 ? 140 : i === cols - 1 ? 60 : 90} h={12} />
+        </td>
+      ))}
+    </tr>
+  );
+}
+
+function DashboardSkeleton() {
+  return (
+    <div style={{ background: C.bg, minHeight: "100vh", color: C.text, fontFamily: C.fontSans }}>
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        @keyframes auken-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+      `}</style>
+      <nav style={{
+        background: C.surface,
+        borderBottom: `1px solid ${C.border}`,
+        padding: "0 28px",
+        height: 56,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "space-between",
+        boxShadow: C.shadowSm,
+      }}>
+        <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+          <Skeleton w={32} h={32} r={C.radius} />
+          <Skeleton w={160} h={16} />
+          <Skeleton w={78} h={12} />
+        </div>
+        <div style={{ display: "flex", gap: 10 }}>
+          <Skeleton w={72} h={30} r={C.radius} />
+          <Skeleton w={92} h={30} r={C.radius} />
+        </div>
+      </nav>
+      <main style={{ padding: "24px 32px 40px", maxWidth: 1200, margin: "0 auto" }}>
+        <div style={{ display: "flex", gap: 8, marginBottom: 18 }}>
+          {[82, 72, 86, 74, 110].map((w, i) => <Skeleton key={i} w={w} h={32} r={C.radius} />)}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12, marginBottom: 16 }}>
+          {Array.from({ length: 4 }).map((_, i) => <KpiSkeleton key={i} />)}
+        </div>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12, marginBottom: 16 }}>
+          {Array.from({ length: 3 }).map((_, i) => <KpiSkeleton key={i} />)}
+        </div>
+        <Card>
+          <Skeleton w={140} h={14} style={{ marginBottom: 18 }} />
+          <table style={{ width: "100%", borderCollapse: "collapse" }}>
+            <tbody>
+              {Array.from({ length: 5 }).map((_, i) => <TableRowSkeleton key={i} cols={5} />)}
+            </tbody>
+          </table>
+        </Card>
+      </main>
+    </div>
+  );
+}
+
 // ─────────────────────────────────────────────────────────────
 // EMPTY STATE — cuadrícula con nodo pulsante (Linear/Vercel style)
 // ─────────────────────────────────────────────────────────────
@@ -1493,7 +1597,21 @@ function TabEnVivo({ citas, optica }) {
           scrollbarWidth: "thin",
         }}>
           {loadingMsgs && (
-            <div style={{ color: C.textMuted, fontSize: 12, textAlign: "center", padding: 24 }}>Cargando mensajes...</div>
+            <div style={{ display: "flex", flexDirection: "column", gap: 10, padding: 4 }}>
+              {Array.from({ length: 6 }).map((_, i) => (
+                <div key={i} style={{
+                  alignSelf: i % 2 ? "flex-end" : "flex-start",
+                  width: i % 2 ? "72%" : "58%",
+                  background: i % 2 ? `${C.primarySoft}` : C.surfaceL,
+                  border: `1px solid ${i % 2 ? C.primaryRing : C.border}`,
+                  borderRadius: i % 2 ? "12px 12px 3px 12px" : "12px 12px 12px 3px",
+                  padding: "9px 12px",
+                }}>
+                  <Skeleton w={i % 2 ? "82%" : "68%"} h={10} />
+                  <Skeleton w={i % 3 ? "54%" : "78%"} h={10} style={{ marginTop: 7 }} />
+                </div>
+              ))}
+            </div>
           )}
           {!loadingMsgs && !loadError && mensajes.length === 0 && (
             <EmptyState
@@ -1762,15 +1880,7 @@ export default function AukenOpticaDashboard() {
   // RENDER
   // ─────────────────────────────────────────────────────────────
   if (loading) {
-    return (
-      <div style={{ background: C.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", color: C.textDim }}>
-        <div style={{ textAlign: "center" }}>
-          <div style={{ width: 32, height: 32, border: `3px solid ${C.border}`, borderTopColor: C.primary, borderRadius: "50%", margin: "0 auto 16px", animation: "spin 1s linear infinite" }} />
-          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
-          <div>Cargando dashboard...</div>
-        </div>
-      </div>
-    );
+    return <DashboardSkeleton />;
   }
 
   if (error) {
@@ -1798,6 +1908,7 @@ export default function AukenOpticaDashboard() {
         * { box-sizing: border-box; margin: 0; padding: 0; }
         ::-webkit-scrollbar { width: 6px; background: ${C.bg}; }
         ::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 6px; }
+        @keyframes auken-shimmer { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
       `}</style>
 
       {/* TOPNAV */}
