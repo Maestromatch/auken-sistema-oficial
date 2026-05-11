@@ -14,21 +14,57 @@ import { useViewport } from "../lib/useViewport";
 //   - QueueMonitor integrado para ver salud del sistema
 // =============================================================
 
+// ── Design Tokens v2 (Linear.app × Vercel Dashboard) ────────────
 const C = {
-  bg:         "#090A0F",
-  surface:    "#11131C",
-  surfaceL:   "#1A1D2A",
-  border:     "#23283A",
-  borderGlow: "#FB923C40",
-  text:       "#F8FAFC",
-  textDim:    "#94A3B8",
-  textMuted:  "#475569",
-  primary:    "#FB923C",
-  primaryD:   "#7DD3FC",
-  green:      "#10B981",
-  amber:      "#F59E0B",
-  red:        "#F43F5E",
-  blue:       "#7DD3FC",
+  // surfaces
+  bg:          '#08090C',
+  surface:     '#0E1014',
+  surfaceL:    '#16181D',
+  surfaceH:    '#1C1F26',
+  overlay:     'rgba(8,9,12,0.72)',
+  // borders
+  border:      '#1F2229',
+  borderL:     '#2A2E37',
+  borderStrong:'#363A44',
+  // text
+  text:        '#EDEEF0',
+  textDim:     '#8A8F98',
+  textMuted:   '#5C616C',   // alias → usa textMuted donde estaba en el código anterior
+  textMute:    '#5C616C',
+  textInv:     '#08090C',
+  // brand
+  primary:     '#F97316',
+  primaryH:    '#FB8B30',
+  primaryD:    '#C2570C',
+  primarySoft: 'rgba(249,115,22,0.12)',
+  primaryRing: 'rgba(249,115,22,0.35)',
+  borderGlow:  'rgba(249,115,22,0.35)',  // alias backward compat
+  // semantic
+  green:       '#34D399',
+  greenSoft:   'rgba(52,211,153,0.10)',
+  red:         '#F87171',
+  redSoft:     'rgba(248,113,113,0.10)',
+  blue:        '#7DD3FC',
+  blueSoft:    'rgba(125,211,252,0.10)',
+  yellow:      '#FBBF24',
+  yellowSoft:  'rgba(251,191,36,0.10)',
+  amber:       '#FBBF24',   // alias backward compat
+  // typography
+  fontSans:    'Inter, ui-sans-serif, system-ui, -apple-system, sans-serif',
+  fontMono:    '"JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace',
+  // shape
+  radiusSm:    6,
+  radius:      8,
+  radiusLg:    12,
+  radiusXl:    16,
+  // shadow
+  shadowSm:    '0 1px 2px rgba(0,0,0,0.4)',
+  shadow:      '0 1px 2px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.04)',
+  shadowLg:    '0 8px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04)',
+  glowPrimary: '0 0 0 1px rgba(249,115,22,0.4), 0 0 24px rgba(249,115,22,0.15)',
+  // motion
+  ease:        'cubic-bezier(0.16, 1, 0.3, 1)',
+  dur:         '160ms',
 };
 
 // ─────────────────────────────────────────────────────────────
@@ -60,9 +96,10 @@ function Card({ children, style = {}, accent }) {
       background: C.surface,
       border: `1px solid ${C.border}`,
       borderTop: accent ? `2px solid ${accent}` : `1px solid ${C.border}`,
-      borderRadius: 12,
+      borderRadius: C.radiusLg,
       padding: 20,
-      boxShadow: "0 4px 16px rgba(0,0,0,.4)",
+      boxShadow: C.shadow,
+      transition: `border-color ${C.dur} ${C.ease}`,
       ...style,
     }}>{children}</div>
   );
@@ -71,13 +108,25 @@ function Card({ children, style = {}, accent }) {
 function KPI({ label, value, color, sub, glow }) {
   return (
     <Card accent={color} style={{
-      boxShadow: glow ? `0 0 20px ${color}25` : undefined,
+      boxShadow: glow ? C.glowPrimary : C.shadow,
+      minHeight: 104,
+      display: 'flex',
+      flexDirection: 'column',
+      gap: 4,
     }}>
-      <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 32, color, lineHeight: 1, textShadow: glow ? `0 0 12px ${color}50` : "none" }}>
+      <div style={{
+        fontFamily: C.fontMono,
+        fontWeight: 600,
+        fontSize: 32,
+        color,
+        lineHeight: 1.1,
+        letterSpacing: '-0.02em',
+        fontVariantNumeric: 'tabular-nums',
+      }}>
         {value ?? "—"}
       </div>
-      <div style={{ fontSize: 12, color: C.textDim, fontWeight: 500, marginTop: 6 }}>{label}</div>
-      {sub && <div style={{ fontSize: 11, color: C.textMuted, marginTop: 2 }}>{sub}</div>}
+      <div style={{ fontFamily: C.fontSans, fontSize: 13, color: C.text, fontWeight: 500, marginTop: 2, letterSpacing: '-0.01em' }}>{label}</div>
+      {sub && <div style={{ fontFamily: C.fontSans, fontSize: 12, color: C.textMuted, fontWeight: 400, marginTop: 1 }}>{sub}</div>}
     </Card>
   );
 }
@@ -85,11 +134,20 @@ function KPI({ label, value, color, sub, glow }) {
 function Pill({ label, color }) {
   return (
     <span style={{
-      background: `${color}20`,
-      color, border: `1px solid ${color}40`,
-      borderRadius: 4, padding: "2px 8px",
-      fontSize: 11, fontWeight: 600,
-      fontFamily: "'IBM Plex Mono', monospace",
+      display: 'inline-flex',
+      alignItems: 'center',
+      height: 22,
+      padding: '0 8px',
+      background: `${color}18`,
+      color,
+      border: `1px solid ${color}35`,
+      borderRadius: C.radiusSm,
+      fontFamily: C.fontSans,
+      fontSize: 11,
+      fontWeight: 500,
+      letterSpacing: '0.01em',
+      lineHeight: 1,
+      whiteSpace: 'nowrap',
     }}>{label}</span>
   );
 }
@@ -1542,7 +1600,7 @@ export default function AukenOpticaDashboard() {
   return (
     <div style={{ background: C.bg, minHeight: "100vh", color: C.text, fontFamily: "'Inter', sans-serif" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
         * { box-sizing: border-box; margin: 0; padding: 0; }
         ::-webkit-scrollbar { width: 6px; background: ${C.bg}; }
         ::-webkit-scrollbar-thumb { background: ${C.border}; border-radius: 6px; }
@@ -1550,14 +1608,17 @@ export default function AukenOpticaDashboard() {
 
       {/* TOPNAV */}
       <nav style={{
-        background: `${C.surface}E6`, backdropFilter: "blur(12px)",
-        borderBottom: `1px solid ${C.border}`, padding: isMobile ? "0 12px" : "0 32px",
-        height: isMobile ? 52 : 60, display: "flex", alignItems: "center", justifyContent: "space-between",
+        background: C.surface,
+        borderBottom: `1px solid ${C.border}`,
+        padding: isMobile ? "0 12px" : "0 28px",
+        height: isMobile ? 48 : 56,
+        display: "flex", alignItems: "center", justifyContent: "space-between",
         position: "sticky", top: 0, zIndex: 50, gap: 8,
+        boxShadow: C.shadowSm,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-          <div style={{ width: isMobile ? 28 : 32, height: isMobile ? 28 : 32, background: `linear-gradient(135deg, ${C.primary}, ${C.primaryD})`, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: isMobile ? 14 : 16, flexShrink: 0 }}>👁️</div>
-          <span style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: isMobile ? 14 : 18, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{optica?.nombre || "AUKÉN"}</span>
+          <div style={{ width: isMobile ? 28 : 32, height: isMobile ? 28 : 32, background: `linear-gradient(135deg, ${C.primary}, ${C.blue})`, borderRadius: C.radius, display: "flex", alignItems: "center", justifyContent: "center", fontSize: isMobile ? 14 : 16, flexShrink: 0, boxShadow: `0 0 12px ${C.primarySoft}` }}>👁️</div>
+          <span style={{ fontFamily: C.fontSans, fontWeight: 700, fontSize: isMobile ? 14 : 17, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", letterSpacing: '-0.02em' }}>{optica?.nombre || "AUKÉN"}</span>
           {!isMobile && (
             <>
               <span style={{ color: C.textMuted, margin: "0 4px" }}>·</span>
@@ -1568,17 +1629,17 @@ export default function AukenOpticaDashboard() {
         <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 6 : 12, flexShrink: 0 }}>
           <button onClick={() => navigate("/optica")}
             title="Ir al monitor de conversaciones"
-            style={{ background: `${C.primary}15`, border: `1px solid ${C.primary}40`, color: C.primary, borderRadius: 6, padding: isMobile ? "5px 10px" : "6px 12px", fontSize: isMobile ? 11 : 12, fontWeight: 700, cursor: "pointer" }}>
+            style={{ background: C.primarySoft, border: `1px solid ${C.primaryRing}`, color: C.primary, borderRadius: C.radius, padding: isMobile ? "5px 10px" : "5px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", letterSpacing: '-0.01em', transition: `background ${C.dur} ${C.ease}` }}>
             💬 {isMobile ? "" : "Chat"}
           </button>
           {!isMobile && (
-            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: C.green, fontWeight: 600, background: `${C.green}10`, padding: "4px 10px", borderRadius: 16 }}>
-              <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.green, boxShadow: `0 0 6px ${C.green}` }} />
+            <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: C.green, fontWeight: 500, background: C.greenSoft, padding: "4px 10px", borderRadius: C.radiusSm, border: `1px solid rgba(52,211,153,0.2)` }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.green, boxShadow: `0 0 6px ${C.green}80` }} />
               Activo
             </div>
           )}
           <button onClick={() => { localStorage.removeItem("auken_auth"); navigate("/login"); }}
-            style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textDim, borderRadius: 6, padding: isMobile ? "5px 10px" : "6px 12px", fontSize: isMobile ? 11 : 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+            style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textDim, borderRadius: C.radius, padding: isMobile ? "5px 10px" : "5px 12px", fontSize: 12, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap", letterSpacing: '-0.01em' }}>
             {isMobile ? "Salir" : "Cerrar sesión"}
           </button>
         </div>
@@ -1586,23 +1647,28 @@ export default function AukenOpticaDashboard() {
 
       {/* TABS */}
       <div style={{ padding: isMobile ? "12px 10px 24px" : "24px 32px 32px", maxWidth: 1200, margin: "0 auto" }}>
-        <div style={{ display: "flex", gap: 6, borderBottom: `1px solid ${C.border}`, paddingBottom: 12, marginBottom: 16, overflowX: "auto", scrollbarWidth: "none" }}>
+        <div style={{ display: "flex", gap: 2, borderBottom: `1px solid ${C.border}`, paddingBottom: 0, marginBottom: 20, overflowX: "auto", scrollbarWidth: "none" }}>
           {[
             ["metricas",  "📊 Métricas"],
             ["enlive",    isMobile ? "🔴 Vivo" : "🔴 En Vivo"],
             ["pacientes", isMobile ? `👥 (${pacientes.length})` : `👥 Pacientes (${pacientes.length})`],
             ["citas",     isMobile ? `📅 (${citas.filter(c => c.estado === "pendiente_confirmacion").length})` : `📅 Citas (${citas.filter(c => c.estado === "pendiente_confirmacion").length})`],
-            ["config",    isMobile ? "⚙️" : "⚙️ Configuración"],
+            ["config",    isMobile ? "⚙️" : "⚙️ Config"],
           ].map(([id, label]) => (
             <button key={id} onClick={() => setTab(id)} style={{
-              background: tab === id ? C.surfaceL : "transparent",
+              background: "transparent",
               color: tab === id ? C.text : C.textDim,
-              border: tab === id ? `1px solid ${C.borderGlow}` : "1px solid transparent",
-              borderRadius: 8,
-              padding: isMobile ? "7px 12px" : "8px 16px",
+              border: "none",
+              borderBottom: tab === id ? `2px solid ${C.primary}` : "2px solid transparent",
+              borderRadius: 0,
+              padding: isMobile ? "8px 12px" : "9px 16px",
               fontSize: isMobile ? 12 : 13,
-              fontWeight: tab === id ? 600 : 500, cursor: "pointer", transition: "all .2s",
+              fontWeight: tab === id ? 600 : 400,
+              cursor: "pointer",
+              transition: `color ${C.dur} ${C.ease}, border-color ${C.dur} ${C.ease}`,
               whiteSpace: "nowrap",
+              letterSpacing: '-0.01em',
+              marginBottom: -1,
             }}>
               {label}
             </button>

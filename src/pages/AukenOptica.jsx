@@ -14,23 +14,47 @@ function useViewport() {
   return { w, isMobile: w < 768, isTablet: w >= 768 && w < 1100 };
 }
 
+// ── Design Tokens v2 (Linear.app × Vercel Dashboard) ────────────
 const C = {
-  bg:        "#05060A",
-  surface:   "#0E1018",
-  surfaceL:  "#161923",
-  surfaceXL: "#1E2330",
-  border:    "rgba(255,255,255,0.07)",
-  borderHot: "rgba(251,146,60,0.35)",
-  ink:       "#F1F5F9",
-  inkMid:    "#94A3B8",
-  inkFaint:  "#475569",
-  primary:   "#FB923C",
-  primaryD:  "#F97316",
-  neon:      "#7DD3FC",
-  green:     "#10B981",
-  amber:     "#F59E0B",
-  red:       "#F43F5E",
-  purple:    "#A78BFA",
+  // surfaces
+  bg:        '#08090C',
+  surface:   '#0E1014',
+  surfaceL:  '#16181D',
+  surfaceXL: '#1C1F26',
+  // borders
+  border:    'rgba(255,255,255,0.065)',
+  borderHot: 'rgba(249,115,22,0.35)',
+  // text (aliases para compatibilidad con el resto del archivo)
+  ink:       '#EDEEF0',
+  inkMid:    '#8A8F98',
+  inkFaint:  '#5C616C',
+  // brand
+  primary:   '#F97316',
+  primaryD:  '#C2570C',
+  primarySoft:'rgba(249,115,22,0.12)',
+  primaryRing:'rgba(249,115,22,0.35)',
+  // accent
+  neon:      '#7DD3FC',
+  // semantic
+  green:     '#34D399',
+  greenSoft: 'rgba(52,211,153,0.10)',
+  amber:     '#FBBF24',
+  red:       '#F87171',
+  redSoft:   'rgba(248,113,113,0.10)',
+  purple:    '#A78BFA',
+  // typography
+  fontSans:  'Inter, ui-sans-serif, system-ui, -apple-system, sans-serif',
+  fontMono:  '"JetBrains Mono", ui-monospace, "SF Mono", Menlo, monospace',
+  // shape
+  radius:    8,
+  radiusSm:  6,
+  radiusLg:  12,
+  // shadow
+  shadow:    '0 1px 2px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.04)',
+  shadowLg:  '0 8px 24px rgba(0,0,0,0.5), 0 0 0 1px rgba(255,255,255,0.04)',
+  // motion
+  ease:      'cubic-bezier(0.16, 1, 0.3, 1)',
+  dur:       '160ms',
 };
 
 // ── Respuestas rápidas ────────────────────────────────────────────────────────
@@ -496,7 +520,7 @@ export default function AukenOptica() {
   return (
     <div style={{ background: C.bg, height: "100vh", color: C.ink, fontFamily: "'Inter', sans-serif", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <style>{`
-        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Outfit:wght@700&family=IBM+Plex+Mono:wght@400;500&display=swap');
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=JetBrains+Mono:wght@400;500;600&display=swap');
         *{box-sizing:border-box;margin:0;padding:0}
         ::-webkit-scrollbar{width:3px}
         ::-webkit-scrollbar-thumb{background:${C.border};border-radius:4px}
@@ -511,8 +535,8 @@ export default function AukenOptica() {
       {newMsgAlert && (
         <div style={{
           position: "fixed", top: 16, right: 16, zIndex: 999,
-          background: C.surfaceXL, border: `1px solid ${C.primary}50`,
-          borderRadius: 12, padding: "12px 18px", boxShadow: `0 8px 32px rgba(0,0,0,.5)`,
+          background: C.surfaceXL, border: `1px solid ${C.primaryRing}`,
+          borderRadius: C.radiusLg, padding: "12px 18px", boxShadow: C.shadowLg,
           animation: "slideIn 0.3s ease-out", display: "flex", alignItems: "center", gap: 10,
         }}>
           <span style={{ fontSize: 16 }}>💬</span>
@@ -525,10 +549,11 @@ export default function AukenOptica() {
 
       {/* ── TOP NAV ─────────────────────────────────────────────────────── */}
       <nav style={{
-        height: 50, borderBottom: `1px solid ${C.border}`,
-        background: `${C.surface}F5`, backdropFilter: "blur(12px)",
+        height: 48, borderBottom: `1px solid ${C.border}`,
+        background: C.surface,
         display: "flex", alignItems: "center", justifyContent: "space-between",
         padding: "0 20px", flexShrink: 0, zIndex: 50,
+        boxShadow: '0 1px 2px rgba(0,0,0,0.4)',
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
           {isMobile && (
@@ -537,8 +562,8 @@ export default function AukenOptica() {
               ☰
             </button>
           )}
-          <div style={{ width: 26, height: 26, background: `linear-gradient(135deg, ${C.primary}, ${C.neon})`, borderRadius: 6, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13 }}>👁️</div>
-          <span style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 14 }}>Monitor</span>
+          <div style={{ width: 26, height: 26, background: `linear-gradient(135deg, ${C.primary}, ${C.neon})`, borderRadius: C.radiusSm, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, boxShadow: `0 0 10px ${C.primarySoft}` }}>👁️</div>
+          <span style={{ fontFamily: C.fontSans, fontWeight: 700, fontSize: 14, letterSpacing: '-0.02em' }}>Monitor</span>
           <span style={{ color: C.inkFaint }}>·</span>
           <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: C.green }}>
             <Dot color={C.green} size={6} glow pulse />
