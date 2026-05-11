@@ -76,6 +76,12 @@ export async function loadOpticaConfig(supabase, slug = "glowvision") {
  */
 export function buildSystemPrompt(paciente, canal = "whatsapp", summary = null, opticaCfg = null) {
   const o = opticaCfg || OPTICA_FALLBACK;
+  const servicios = Array.isArray(o.servicios)
+    ? o.servicios.filter(s => s && (s.nombre || s.precio))
+    : [];
+  const serviciosSection = servicios.length
+    ? servicios.map((s, i) => `${i + 1}. ${s.nombre || "Servicio"}${s.precio ? ` — ${s.precio}` : ""}`).join("\n")
+    : "No hay servicios configurados. Si preguntan por servicios, pide que indiquen qué necesitan y ofrece derivar con una persona.";
   const isDemoPending = Array.isArray(paciente?.tags) && paciente.tags.includes("demo-pending");
   const esRegistrado = !!paciente && !isDemoPending;
   const recetaVencida = paciente?.estado_receta === "vencida";
@@ -135,10 +141,16 @@ NEGOCIO:
 - Dirección: ${o.direccion}${o.ciudad ? `, ${o.ciudad}` : ""}
 - Horario: ${o.horario}
 - Teléfono: ${o.telefono}
+- Promoción estrella: ${o.promocion_estrella || "sin promoción configurada"}
+
+SERVICIOS Y PRECIOS CONFIGURADOS EN EL DASHBOARD:
+${serviciosSection}
 
 ESTRATEGIA DE VENTAS:
 - Si el paciente tiene la receta vencida, dile: "He visto que tu última receta es de hace más de un año. ¡Es vital que revisemos tu visión! Podríamos agendarte un examen hoy mismo, ¿te parece?".
-- Si preguntan precios, da el rango y añade el valor agregado: "Nuestros lentes monofocales parten desde $45.000, pero lo mejor es que incluyen marcos de excelente calidad y garantía".
+- Si preguntan por servicios, qué ofrecen o precios, responde usando primero y de forma explícita SOLO la lista de "SERVICIOS Y PRECIOS CONFIGURADOS EN EL DASHBOARD".
+- No inventes servicios, categorías, precios ni beneficios que no estén en esa lista. Si quieres sumar algo extra, menciona solo la promoción estrella configurada y deja una pregunta abierta.
+- Si la lista configurada tiene nombres o precios raros, respóndelos igual: son datos cargados por la óptica y no debes reemplazarlos por servicios genéricos.
 
 CANAL: ${canalGuidance[canal] || canalGuidance.whatsapp}
 
