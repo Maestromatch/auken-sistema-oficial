@@ -1092,35 +1092,63 @@ function PatientModal({ patient, opticaId, onClose, refresh }) {
 // ─────────────────────────────────────────────────────────────
 function TabEnVivo({ citas, optica }) {
   const { isMobile } = useViewport();
-  const [mensajes, setMensajes] = useState([]);
+  const [mensajes, setMensajes]     = useState([]);
   const [loadingMsgs, setLoadingMsgs] = useState(true);
+  const [loadError, setLoadError]   = useState(null);
+  const [liveCount, setLiveCount]   = useState(0); // pulsos de actividad
   const msgEndRef = useRef(null);
 
   const loadMensajes = useCallback(async () => {
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("mensajes_chat")
-      .select("*")
+      .select("id, paciente_id, remitente, contenido, created_at")
       .order("created_at", { ascending: false })
-      .limit(40);
+      .limit(60);
+
+    if (error) {
+      // Error más común: tabla no en realtime publication o columna faltante
+      console.error("[TabEnVivo] Error cargando mensajes:", error.message);
+      setLoadError(error.message);
+      setLoadingMsgs(false);
+      return;
+    }
+
+    setLoadError(null);
     setMensajes((data || []).reverse());
     setLoadingMsgs(false);
+    setLiveCount(n => n + 1);
   }, []);
 
   useEffect(() => {
     loadMensajes();
-    const sub = supabase.channel("enlive_mensajes_tab")
+
+    // Polling cada 8 segundos como fallback si el realtime no funciona aún
+    // (ocurre antes de ejecutar la migración 008 que habilita la publicación)
+    const pollInterval = setInterval(loadMensajes, 8000);
+
+    // Suscripción realtime (requiere migración 008 ejecutada en Supabase)
+    const sub = supabase.channel("enlive_mensajes_tab_v2")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "mensajes_chat" }, () => {
         loadMensajes();
-        setTimeout(() => msgEndRef.current?.scrollIntoView({ behavior: "smooth" }), 150);
+        setTimeout(() => msgEndRef.current?.scrollIntoView({ behavior: "smooth" }), 200);
       })
-      .subscribe();
-    return () => supabase.removeChannel(sub);
+      .subscribe((status) => {
+        if (status === "SUBSCRIBED") {
+          console.log("[TabEnVivo] Realtime activo en mensajes_chat");
+          clearInterval(pollInterval); // Realtime OK, cancelar polling
+        }
+      });
+
+    return () => {
+      clearInterval(pollInterval);
+      supabase.removeChannel(sub);
+    };
   }, [loadMensajes]);
 
-  // Scroll al último mensaje cuando cargan
+  // Scroll al último mensaje al cargar
   useEffect(() => {
-    if (!loadingMsgs) {
-      setTimeout(() => msgEndRef.current?.scrollIntoView({ behavior: "smooth" }), 100);
+    if (!loadingMsgs && mensajes.length > 0) {
+      setTimeout(() => msgEndRef.current?.scrollIntoView({ behavior: "smooth" }), 150);
     }
   }, [loadingMsgs]);
 
@@ -1146,20 +1174,42 @@ function TabEnVivo({ citas, optica }) {
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <span style={{
               width: 8, height: 8, borderRadius: "50%",
-              background: C.green, boxShadow: `0 0 6px ${C.green}`,
-              display: "inline-block", animation: "pulse 2s infinite",
+              background: loadError ? C.red : C.green,
+              boxShadow: `0 0 6px ${loadError ? C.red : C.green}`,
+              display: "inline-block", animation: loadError ? "none" : "pulse 2s infinite",
             }} />
             <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }`}</style>
             <span style={{ fontWeight: 700, fontSize: 14, color: C.text }}>💬 Chat en vivo</span>
-            <span style={{ fontSize: 11, color: C.textMuted }}>({mensajes.length})</span>
+            <span style={{ fontSize: 11, color: C.textMuted }}>
+              {loadError ? "⚠️ error" : `${mensajes.length} msgs`}
+            </span>
           </div>
-          <button
-            onClick={() => window.location.assign("/optica")}
-            style={{ fontSize: 11, color: C.primary, fontWeight: 700, background: `${C.primary}15`, border: `1px solid ${C.primary}40`, borderRadius: 6, padding: "4px 10px", cursor: "pointer" }}
-          >
-            Abrir monitor →
-          </button>
+          <div style={{ display: "flex", gap: 6 }}>
+            <button
+              onClick={loadMensajes}
+              style={{ fontSize: 10, color: C.textDim, background: `${C.border}50`, border: `1px solid ${C.border}`, borderRadius: 5, padding: "3px 8px", cursor: "pointer" }}
+            >
+              ↻
+            </button>
+            <a href="/optica"
+              style={{ fontSize: 11, color: C.primary, fontWeight: 700, background: `${C.primary}15`, border: `1px solid ${C.primary}40`, borderRadius: 6, padding: "4px 10px", textDecoration: "none", display: "inline-flex", alignItems: "center" }}
+            >
+              Abrir monitor →
+            </a>
+          </div>
         </div>
+
+        {/* Banner de error si la migración 008 no se ejecutó */}
+        {loadError && (
+          <div style={{
+            background: `${C.red}15`, borderBottom: `1px solid ${C.red}30`,
+            padding: "8px 14px", fontSize: 11, color: C.red, lineHeight: 1.5,
+          }}>
+            ⚠️ <strong>Error:</strong> {loadError}
+            <br />
+            <span style={{ color: C.textDim }}>Ejecuta la migración 008 en Supabase SQL Editor para activar realtime en mensajes_chat.</span>
+          </div>
+        )}
 
         <div style={{
           height: isMobile ? 300 : 440, overflowY: "auto",
@@ -1169,10 +1219,10 @@ function TabEnVivo({ citas, optica }) {
           {loadingMsgs && (
             <div style={{ color: C.textMuted, fontSize: 12, textAlign: "center", padding: 24 }}>Cargando mensajes...</div>
           )}
-          {!loadingMsgs && mensajes.length === 0 && (
+          {!loadingMsgs && !loadError && mensajes.length === 0 && (
             <div style={{ color: C.textMuted, fontSize: 12, textAlign: "center", padding: 24 }}>
               Sin mensajes aún.<br />
-              <span style={{ fontSize: 11 }}>Los mensajes del bot y pacientes aparecerán aquí en tiempo real.</span>
+              <span style={{ fontSize: 11 }}>Prueba el chat desde el Monitor. Los mensajes aparecerán aquí.</span>
             </div>
           )}
           {mensajes.map((m, i) => {
@@ -1399,16 +1449,33 @@ export default function AukenOpticaDashboard() {
     if (optica) document.title = `${optica.nombre} | Aukén`;
   }, [optica?.nombre]);
 
-  // Acción WhatsApp (definida en parent, pasada como prop)
-  const handleSendWhatsApp = useCallback(async (paciente) => {
+  // Acción WhatsApp — normaliza número chileno y abre wa.me
+  // NO es async porque window.open necesita estar en el contexto directo del evento
+  const handleSendWhatsApp = useCallback((paciente) => {
     if (!paciente?.telefono) {
       alert("Este paciente no tiene teléfono registrado.");
       return;
     }
+
+    // Normalizar número: quitar todo lo que no sea dígito
+    let phone = paciente.telefono.replace(/\D/g, "");
+    // Si empieza con 0, quitarlo (ej: 09xxxxxxxx → 9xxxxxxxx)
+    if (phone.startsWith("0")) phone = phone.slice(1);
+    // Si tiene 8 o 9 dígitos sin prefijo de país, asumir Chile (+56)
+    if (phone.length <= 9 && !phone.startsWith("56")) phone = "56" + phone;
+    // Si empieza con 569... ya está correcto; si empieza con 56 + 8 dígitos también.
+
+    const nombre = (paciente.nombre || "Estimado").split(" ")[0];
     const msg = encodeURIComponent(
-      `Hola ${paciente.nombre.split(" ")[0]} 👋, te escribimos de ${optica?.nombre || "la óptica"}.`
+      `Hola ${nombre} 👋, te escribimos de ${optica?.nombre || "la óptica"}. ¿En qué te podemos ayudar?`
     );
-    window.open(`https://wa.me/${paciente.telefono.replace(/\D/g, "")}?text=${msg}`, "_blank");
+
+    // window.open con rel noopener — más confiable que location.href en desktop
+    // En mobile iOS/Android abre la app de WhatsApp directamente
+    const waUrl = `https://wa.me/${phone}?text=${msg}`;
+    const win = window.open(waUrl, "_blank", "noopener,noreferrer");
+    // Fallback por si el popup blocker lo bloqueó
+    if (!win) window.location.href = waUrl;
   }, [optica]);
 
   // ─────────────────────────────────────────────────────────────

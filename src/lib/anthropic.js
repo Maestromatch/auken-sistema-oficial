@@ -1,6 +1,7 @@
 // =============================================================
 // AUKÉN — Cliente Anthropic centralizado
 // Maneja: llamadas a Claude, retries, tracking de costos
+// FASE 0 activa: Prompt Caching para ~75% ahorro en tokens input
 // =============================================================
 
 const ANTHROPIC_URL = "https://api.anthropic.com/v1/messages";
@@ -16,21 +17,39 @@ export const MODELS = {
   REASONING: "claude-opus-4-7",
 };
 
-// Precios por millón de tokens (USD). Verificados en docs.claude.com/pricing
-// Sonnet 4.6: $3 input / $15 output
-// Haiku 4.5:  $1 input / $5 output
-// Opus 4.7:   $5 input / $25 output
+// Precios por millón de tokens (USD). Verificados en docs.anthropic.com/pricing
+// Claude Sonnet 4.6: $3.00 input / $15.00 output
+//   Con cache:        $3.75 cache-write / $0.30 cache-read (10% del normal!)
+// Claude Haiku 4.5:  $1.00 input / $5.00 output
+// Claude Opus 4.7:   $5.00 input / $25.00 output
 const PRICING = {
-  "claude-sonnet-4-6":         { in: 3.00, out: 15.00 },
-  "claude-haiku-4-5-20251001": { in: 1.00, out: 5.00 },
-  "claude-opus-4-7":           { in: 5.00, out: 25.00 },
+  "claude-sonnet-4-6": {
+    in:          3.00,
+    out:         15.00,
+    cacheWrite:  3.75,   // 125% del input (primera vez, escribe al caché)
+    cacheRead:   0.30,   // 10% del input  (llamadas siguientes, lee del caché)
+  },
+  "claude-haiku-4-5-20251001": {
+    in:          1.00,
+    out:         5.00,
+    cacheWrite:  1.25,
+    cacheRead:   0.10,
+  },
+  "claude-opus-4-7": {
+    in:          5.00,
+    out:         25.00,
+    cacheWrite:  6.25,
+    cacheRead:   0.50,
+  },
 };
 
 /**
- * Llama a Claude y devuelve { text, usage, costUsd, latencyMs }
+ * Llama a Claude con Prompt Caching activo.
+ * El system prompt se marca como ephemeral cache → TTL 5 min en Anthropic.
+ * Primera llamada: cache-write (125% costo input). Siguientes: cache-read (10%).
  *
  * @param {object} params
- * @param {string} params.system        - System prompt
+ * @param {string} params.system        - System prompt (se cachea automáticamente)
  * @param {Array}  params.messages      - [{ role, content }]
  * @param {string} [params.model]       - Default: MODELS.CHAT
  * @param {number} [params.maxTokens]   - Default: 1024
@@ -52,11 +71,25 @@ export async function callClaude({
 
   const startedAt = Date.now();
 
+  // ── FASE 0: Prompt Caching ────────────────────────────────────────────────
+  // El system prompt se pasa como array de content blocks con cache_control.
+  // Anthropic cachea el bloque por 5 minutos; todas las llamadas dentro de
+  // ese TTL usan cache-read (10% del costo normal de input).
+  // Requisito mínimo: 1024 tokens para activar caché (Sonnet/Opus), 2048 (Haiku).
+  const systemBlocks = [
+    {
+      type: "text",
+      text: typeof system === "string" ? system : JSON.stringify(system),
+      cache_control: { type: "ephemeral" },
+    },
+  ];
+  // ─────────────────────────────────────────────────────────────────────────
+
   const body = {
     model,
     max_tokens: maxTokens,
     temperature,
-    system,
+    system: systemBlocks,
     messages,
   };
 
@@ -76,6 +109,7 @@ export async function callClaude({
         headers: {
           "x-api-key": apiKey,
           "anthropic-version": ANTHROPIC_VERSION,
+          "anthropic-beta": "prompt-caching-2024-07-31",   // ← activa caché
           "content-type": "application/json",
         },
         body: JSON.stringify(body),
@@ -110,11 +144,18 @@ export async function callClaude({
   const toolUses = data.content?.filter(b => b.type === "tool_use") || [];
 
   const usage = {
-    inputTokens: data.usage?.input_tokens || 0,
-    outputTokens: data.usage?.output_tokens || 0,
+    inputTokens:       data.usage?.input_tokens              || 0,
+    outputTokens:      data.usage?.output_tokens             || 0,
+    cacheReadTokens:   data.usage?.cache_read_input_tokens   || 0,  // ← FASE 0
+    cacheWriteTokens:  data.usage?.cache_creation_input_tokens || 0, // ← FASE 0
   };
 
   const costUsd = calculateCost(model, usage);
+
+  // Log de caché para visibilidad (solo en dev/servidor)
+  if (usage.cacheReadTokens > 0 || usage.cacheWriteTokens > 0) {
+    console.log(`[claude] cache hit=${usage.cacheReadTokens}tok write=${usage.cacheWriteTokens}tok saved≈${Math.round(usage.cacheReadTokens*0.9)}tok`);
+  }
 
   return {
     text,
@@ -128,14 +169,21 @@ export async function callClaude({
 }
 
 /**
- * Calcula el costo en USD de una llamada
+ * Calcula el costo real en USD considerando tokens de caché (FASE 0).
+ * Con caché activo, el ahorro típico es 70-80% en tokens de input.
  */
 export function calculateCost(model, usage) {
   const pricing = PRICING[model];
   if (!pricing) return null;
-  const inCost = (usage.inputTokens / 1_000_000) * pricing.in;
-  const outCost = (usage.outputTokens / 1_000_000) * pricing.out;
-  return Number((inCost + outCost).toFixed(6));
+
+  // Tokens normales (los que no estaban en caché)
+  const inCost        = (usage.inputTokens       / 1_000_000) * pricing.in;
+  const outCost       = (usage.outputTokens      / 1_000_000) * pricing.out;
+  // Tokens de caché (FASE 0)
+  const cacheWriteCost = ((usage.cacheWriteTokens || 0) / 1_000_000) * (pricing.cacheWrite || pricing.in * 1.25);
+  const cacheReadCost  = ((usage.cacheReadTokens  || 0) / 1_000_000) * (pricing.cacheRead  || pricing.in * 0.10);
+
+  return Number((inCost + outCost + cacheWriteCost + cacheReadCost).toFixed(6));
 }
 
 /**
