@@ -127,8 +127,92 @@ function Tag({ label, color }) {
     <span style={{
       background: `${color}18`, color, border: `1px solid ${color}35`,
       borderRadius: 4, padding: "2px 7px", fontSize: 10, fontWeight: 700,
-      fontFamily: "'IBM Plex Mono', monospace",
+      fontFamily: C.fontMono,
     }}>{label}</span>
+  );
+}
+
+function getMessageKind(m) {
+  const t = (m?.contenido || "").toLowerCase();
+  if (t.includes("cita agendada") || t.includes("google calendar") || t.includes("receta ocr") || t.includes("ocr")) return "system";
+  if (m?.remitente === "bot") return "bot";
+  if (m?.remitente === "admin" || m?.remitente === "operador") return "operator";
+  return "client";
+}
+
+function ChatBubble({ kind, author, text, time, meta }) {
+  if (kind === "system") {
+    return (
+      <div style={{ display: "flex", justifyContent: "center", margin: "10px 0", animation: "fadeUp 0.2s ease-out" }}>
+        <div style={{
+          display: "inline-flex", alignItems: "center", gap: 7,
+          padding: "5px 11px", borderRadius: 999,
+          background: C.surfaceL, border: `1px dashed ${C.border}`,
+          fontSize: 11, color: C.inkMid, fontFamily: C.fontMono,
+          maxWidth: "78%", lineHeight: 1.45,
+        }}>
+          <span style={{ width: 5, height: 5, borderRadius: "50%", background: C.blue, boxShadow: `0 0 8px ${C.blue}`, flexShrink: 0 }} />
+          <span style={{ whiteSpace: "pre-wrap" }}>{text}</span>
+          {meta && <span style={{ color: C.inkFaint }}>· {meta}</span>}
+        </div>
+      </div>
+    );
+  }
+
+  const styles = {
+    client: {
+      wrap: { justifyContent: "flex-start" },
+      bubble: { background: C.surfaceL, color: C.ink, border: `1px solid ${C.border}`, borderRadius: "4px 14px 14px 14px" },
+      avatar: { background: C.surfaceXL, color: C.inkMid, border: `1px solid ${C.border}` },
+    },
+    bot: {
+      wrap: { justifyContent: "flex-start" },
+      bubble: { background: "rgba(249,115,22,0.06)", color: C.ink, border: "1px solid rgba(249,115,22,0.22)", borderRadius: "4px 14px 14px 14px" },
+      avatar: { background: "rgba(249,115,22,0.15)", color: C.primary, border: "1px solid rgba(249,115,22,0.25)" },
+    },
+    operator: {
+      wrap: { justifyContent: "flex-end" },
+      bubble: { background: "rgba(52,211,153,0.08)", color: C.ink, border: "1px solid rgba(52,211,153,0.24)", borderRadius: "14px 4px 14px 14px" },
+      avatar: { background: "rgba(52,211,153,0.15)", color: C.green, border: "1px solid rgba(52,211,153,0.25)" },
+    },
+  }[kind] || {};
+
+  const isOperator = kind === "operator";
+  return (
+    <div style={{ display: "flex", gap: 8, margin: "8px 0", animation: "fadeUp 0.2s ease-out", ...styles.wrap }}>
+      {!isOperator && (
+        <div style={{
+          width: 28, height: 28, borderRadius: 8,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 10, fontWeight: 800, flexShrink: 0,
+          fontFamily: C.fontSans,
+          ...styles.avatar,
+        }}>{kind === "bot" ? "IA" : (author?.[0] || "P").toUpperCase()}</div>
+      )}
+
+      <div style={{ maxWidth: "72%", display: "flex", flexDirection: "column", gap: 4 }}>
+        {kind === "bot" && (
+          <span style={{ fontSize: 10, color: C.primary, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+            AUKÉN IA {meta && <span style={{ color: C.inkFaint, fontWeight: 500 }}>· {meta}</span>}
+          </span>
+        )}
+        {kind === "operator" && (
+          <span style={{ alignSelf: "flex-end", fontSize: 10, color: C.green, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+            Operador
+          </span>
+        )}
+        <div style={{
+          padding: "9px 12px", fontSize: 13, lineHeight: 1.5,
+          fontFamily: C.fontSans, whiteSpace: "pre-wrap", wordBreak: "break-word",
+          ...styles.bubble,
+        }}>{text}</div>
+        <span style={{
+          fontSize: 10, color: C.inkFaint,
+          alignSelf: isOperator ? "flex-end" : "flex-start",
+          fontFamily: C.fontMono, fontVariantNumeric: "tabular-nums",
+        }}>{time}</span>
+      </div>
+    </div>
   );
 }
 
@@ -855,34 +939,19 @@ export default function AukenOptica() {
                       <div style={{ flex: 1, height: 1, background: C.border }} />
                     </div>
                     {msgs.map((m, i) => {
-                      const isClient = m.remitente === "cliente";
-                      const isBot    = m.remitente === "bot";
-                      const isAdmin  = m.remitente === "admin";
-                      const isRight  = isBot || isAdmin;
+                      const kind = getMessageKind(m);
+                      const time = m.created_at
+                        ? new Date(m.created_at).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })
+                        : "";
                       return (
-                        <div key={m.id || i} style={{ display: "flex", flexDirection: "column", alignItems: isRight ? "flex-end" : "flex-start", marginBottom: 10, animation: "fadeUp 0.2s ease-out" }}>
-                          {isBot   && <span style={{ fontSize: 9, color: C.neon,   fontWeight: 700, marginBottom: 3, marginRight: 4 }}>🤖 AUKÉN IA</span>}
-                          {isAdmin && <span style={{ fontSize: 9, color: C.primary, fontWeight: 700, marginBottom: 3, marginRight: 4 }}>👤 OPERADOR</span>}
-                          <div style={{
-                            maxWidth: "68%",
-                            background: isClient
-                              ? C.surfaceXL
-                              : isBot
-                                ? `linear-gradient(135deg, ${C.neon}20, ${C.purple}20)`
-                                : `linear-gradient(135deg, ${C.primary}, ${C.primaryD})`,
-                            color: isAdmin ? "#000" : C.ink,
-                            padding: "10px 14px",
-                            borderRadius: isClient ? "4px 14px 14px 14px" : "14px 14px 4px 14px",
-                            fontSize: 13, lineHeight: 1.55,
-                            border: (isClient || isBot) ? `1px solid ${C.border}` : "none",
-                            boxShadow: isAdmin ? `0 4px 12px ${C.primary}25` : "none",
-                          }}>
-                            {m.contenido}
-                          </div>
-                          <span style={{ fontSize: 9, color: C.inkFaint, marginTop: 3, [isRight ? "marginRight" : "marginLeft"]: 4 }}>
-                            {new Date(m.created_at).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })}
-                          </span>
-                        </div>
+                        <ChatBubble
+                          key={m.id || i}
+                          kind={kind}
+                          author={activeP?.nombre || m.remitente}
+                          text={m.contenido}
+                          time={time}
+                          meta={kind === "bot" ? "respuesta IA" : null}
+                        />
                       );
                     })}
                   </div>

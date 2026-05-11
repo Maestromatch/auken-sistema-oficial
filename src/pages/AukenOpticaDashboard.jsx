@@ -359,6 +359,89 @@ function EmptyState({ title, body, cta, onCta, accent = C.primary }) {
   );
 }
 
+function getLiveMessageKind(m) {
+  const t = (m?.contenido || "").toLowerCase();
+  if (t.includes("cita agendada") || t.includes("google calendar") || t.includes("receta ocr") || t.includes("ocr")) return "system";
+  if (m?.remitente === "bot") return "bot";
+  if (m?.remitente === "admin" || m?.remitente === "operador") return "operator";
+  return "client";
+}
+
+function LiveChatBubble({ kind, author, text, time, meta }) {
+  if (kind === "system") {
+    return (
+      <div style={{ display: "flex", justifyContent: "center", margin: "8px 0" }}>
+        <div style={{
+          display: "inline-flex", alignItems: "center", gap: 6,
+          padding: "4px 10px", borderRadius: 999,
+          background: C.surfaceL, border: `1px dashed ${C.border}`,
+          fontSize: 11, color: C.textDim, fontFamily: C.fontMono,
+          maxWidth: "88%", lineHeight: 1.45,
+        }}>
+          <span style={{ width: 4, height: 4, borderRadius: "50%", background: C.blue, flexShrink: 0 }} />
+          <span style={{ whiteSpace: "pre-wrap" }}>{text}</span>
+          {meta && <span style={{ color: C.textMute }}>· {meta}</span>}
+        </div>
+      </div>
+    );
+  }
+
+  const styles = {
+    client: {
+      wrap: { justifyContent: "flex-start" },
+      bubble: { background: C.surfaceL, color: C.text, border: `1px solid ${C.border}`, borderRadius: "4px 14px 14px 14px" },
+      avatar: { background: C.surfaceH, color: C.textDim, border: `1px solid ${C.border}` },
+    },
+    bot: {
+      wrap: { justifyContent: "flex-start" },
+      bubble: { background: "rgba(249,115,22,0.06)", color: C.text, border: "1px solid rgba(249,115,22,0.22)", borderRadius: "4px 14px 14px 14px" },
+      avatar: { background: "rgba(249,115,22,0.15)", color: C.primary, border: "1px solid rgba(249,115,22,0.25)" },
+    },
+    operator: {
+      wrap: { justifyContent: "flex-end" },
+      bubble: { background: "rgba(52,211,153,0.08)", color: C.text, border: "1px solid rgba(52,211,153,0.24)", borderRadius: "14px 4px 14px 14px" },
+      avatar: { background: "rgba(52,211,153,0.15)", color: C.green, border: "1px solid rgba(52,211,153,0.25)" },
+    },
+  }[kind] || {};
+
+  const isOperator = kind === "operator";
+  return (
+    <div style={{ display: "flex", gap: 8, margin: "7px 0", ...styles.wrap }}>
+      {!isOperator && (
+        <div style={{
+          width: 26, height: 26, borderRadius: 8,
+          display: "flex", alignItems: "center", justifyContent: "center",
+          fontSize: 10, fontWeight: 800, flexShrink: 0,
+          ...styles.avatar,
+        }}>{kind === "bot" ? "IA" : (author?.[0] || "P").toUpperCase()}</div>
+      )}
+
+      <div style={{ maxWidth: "78%", display: "flex", flexDirection: "column", gap: 3 }}>
+        {kind === "bot" && (
+          <span style={{ fontSize: 10, color: C.primary, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+            AUKÉN IA {meta && <span style={{ color: C.textMute, fontWeight: 500 }}>· {meta}</span>}
+          </span>
+        )}
+        {kind === "operator" && (
+          <span style={{ alignSelf: "flex-end", fontSize: 10, color: C.green, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>
+            Operador
+          </span>
+        )}
+        <div style={{
+          padding: "8px 12px", fontSize: 12.5, lineHeight: 1.5,
+          fontFamily: C.fontSans, whiteSpace: "pre-wrap", wordBreak: "break-word",
+          ...styles.bubble,
+        }}>{text}</div>
+        <span style={{
+          fontSize: 10, color: C.textMute,
+          alignSelf: isOperator ? "flex-end" : "flex-start",
+          fontFamily: C.fontMono, fontVariantNumeric: "tabular-nums",
+        }}>{time}</span>
+      </div>
+    </div>
+  );
+}
+
 function Pill({ label, color }) {
   return (
     <span style={{
@@ -1623,35 +1706,19 @@ function TabEnVivo({ citas, optica }) {
             />
           )}
           {mensajes.map((m, i) => {
-            const isBot = m.remitente === "bot";
-            const isCliente = m.remitente === "cliente";
+            const kind = getLiveMessageKind(m);
+            const time = m.created_at
+              ? new Date(m.created_at).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })
+              : "";
             return (
-              <div key={m.id || i} style={{
-                display: "flex",
-                justifyContent: isBot ? "flex-end" : "flex-start",
-              }}>
-                <div style={{
-                  maxWidth: "82%",
-                  background: isBot ? `${C.primary}18` : isCliente ? C.surfaceL : `${C.blue}15`,
-                  border: `1px solid ${isBot ? C.primary + "35" : C.border}`,
-                  borderRadius: isBot ? "12px 12px 3px 12px" : "12px 12px 12px 3px",
-                  padding: "7px 12px",
-                  fontSize: 12,
-                  color: C.text,
-                }}>
-                  {!isBot && (
-                    <div style={{ fontSize: 10, color: isCliente ? C.primary : C.blue, marginBottom: 3, fontWeight: 700, textTransform: "uppercase" }}>
-                      {m.remitente}
-                    </div>
-                  )}
-                  <div style={{ lineHeight: 1.5, wordBreak: "break-word" }}>{m.contenido}</div>
-                  <div style={{ fontSize: 9, color: C.textMuted, marginTop: 3, textAlign: isBot ? "right" : "left" }}>
-                    {m.created_at
-                      ? new Date(m.created_at).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })
-                      : ""}
-                  </div>
-                </div>
-              </div>
+              <LiveChatBubble
+                key={m.id || i}
+                kind={kind}
+                author={m.nombre || m.remitente}
+                text={m.contenido}
+                time={time}
+                meta={kind === "bot" ? "respuesta IA" : null}
+              />
             );
           })}
           <div ref={msgEndRef} />
