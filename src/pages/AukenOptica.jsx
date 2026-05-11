@@ -99,6 +99,34 @@ function fmtTime(ts) {
   return d.toLocaleDateString("es-CL", { day: "2-digit", month: "short" });
 }
 
+function relTime(ts) {
+  if (!ts) return "";
+  const diff = (Date.now() - new Date(ts).getTime()) / 1000;
+  if (Number.isNaN(diff)) return "";
+  if (diff < 60) return "ahora";
+  if (diff < 3600) return `${Math.floor(diff / 60)}m`;
+  if (diff < 86400) return `${Math.floor(diff / 3600)}h`;
+  if (diff < 172800) return "ayer";
+  return new Date(ts).toLocaleDateString("es-CL", { day: "2-digit", month: "short" });
+}
+
+function waitingSeconds(lastMsg) {
+  if (!lastMsg?.created_at || lastMsg.remitente !== "cliente") return 0;
+  return Math.max(0, Math.floor((Date.now() - new Date(lastMsg.created_at).getTime()) / 1000));
+}
+
+function avatarColor(name = "") {
+  const palette = ["#F97316", "#34D399", "#7DD3FC", "#FBBF24", "#A78BFA", "#F472B6", "#22D3EE"];
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
+  return palette[Math.abs(h) % palette.length];
+}
+
+function initials(name = "") {
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  return (parts.length ? parts : ["?"]).map(p => p[0]).slice(0, 2).join("").toUpperCase();
+}
+
 function dateSep(ts) {
   if (!ts) return "Hoy";
   const d = new Date(ts), now = new Date();
@@ -217,47 +245,237 @@ function ChatBubble({ kind, author, text, time, meta }) {
 }
 
 // ── Sidebar row ───────────────────────────────────────────────────────────────
+function StatusPill({ type }) {
+  const map = {
+    pending: ["Pendiente", C.amber, "rgba(251,191,36,0.10)"],
+    human: ["Humano", C.green, "rgba(52,211,153,0.10)"],
+    bot: ["Bot", C.primary, "rgba(249,115,22,0.12)"],
+  };
+  const [label, color, bg] = map[type] || map.bot;
+  return (
+    <span style={{
+      height: 18,
+      display: "inline-flex",
+      alignItems: "center",
+      padding: "0 6px",
+      borderRadius: C.radiusSm,
+      background: bg,
+      color,
+      border: `1px solid ${color}30`,
+      fontFamily: C.fontMono,
+      fontSize: 9,
+      fontWeight: 700,
+      textTransform: "uppercase",
+      letterSpacing: "0.02em",
+      flexShrink: 0,
+    }}>
+      {label}
+    </span>
+  );
+}
+
 function PatientRow({ p, active, onClick, lastMsg, unread }) {
-  const dias = diasReceta(p.fecha_ultima_visita);
-  const recetaColor = dias === null ? C.inkFaint : dias > 365 ? C.red : dias > 335 ? C.amber : C.green;
+  const name = p.nombre || "Sin nombre";
+  const c = avatarColor(name);
+  const waiting = waitingSeconds(lastMsg);
+  const isCritical = waiting > 600;
+  const kind = lastMsg?.remitente === "cliente" ? "pending" : lastMsg?.remitente === "admin" ? "human" : "bot";
+  const preview = lastMsg?.contenido || p.telefono || "Sin mensajes todavía";
 
   return (
-    <div onClick={onClick} style={{
-      padding: "12px 16px", cursor: "pointer", borderRadius: 10, margin: "2px 8px",
-      background: active ? C.surfaceXL : "transparent",
-      border: `1px solid ${active ? C.borderHot : "transparent"}`,
-      transition: "all 0.15s",
-    }}
-    onMouseEnter={e => { if (!active) e.currentTarget.style.background = C.surfaceL; }}
-    onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
+    <button
+      onClick={onClick}
+      className="auken-touch"
+      style={{
+        position: "relative",
+        width: "100%",
+        textAlign: "left",
+        display: "flex",
+        gap: 10,
+        padding: "12px 14px",
+        background: active ? C.surfaceL : "transparent",
+        border: "none",
+        borderBottom: `1px solid ${C.border}`,
+        cursor: "pointer",
+        transition: `background ${C.dur} ${C.ease}`,
+      }}
+      onMouseEnter={e => { if (!active) e.currentTarget.style.background = "#13151A"; }}
+      onMouseLeave={e => { if (!active) e.currentTarget.style.background = "transparent"; }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 6 }}>
-        <div style={{ minWidth: 0, flex: 1 }}>
-          <div style={{ fontWeight: 700, fontSize: 13, color: active ? C.primary : C.ink, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
-            {p.nombre || "Sin nombre"}
-          </div>
-          <div style={{ fontSize: 11, color: C.inkFaint, marginTop: 1 }}>{p.telefono || "—"}</div>
-        </div>
-        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4, flexShrink: 0 }}>
-          <span style={{ fontSize: 9, color: C.inkFaint, whiteSpace: "nowrap" }}>
-            {lastMsg ? fmtTime(lastMsg.created_at) : ""}
+      {active && (
+        <span style={{
+          position: "absolute",
+          left: 0,
+          top: 8,
+          bottom: 8,
+          width: 2,
+          background: C.primary,
+          borderRadius: "0 2px 2px 0",
+        }} />
+      )}
+
+      <div style={{
+        width: 36,
+        height: 36,
+        borderRadius: 10,
+        flexShrink: 0,
+        background: `${c}1A`,
+        color: c,
+        border: `1px solid ${c}33`,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontSize: 13,
+        fontWeight: 700,
+        fontFamily: C.fontSans,
+        letterSpacing: "-0.01em",
+      }}>
+        {initials(name)}
+      </div>
+
+      <div style={{ flex: 1, minWidth: 0, display: "flex", flexDirection: "column", gap: 4 }}>
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+          <span style={{
+            fontSize: 13,
+            fontWeight: unread ? 700 : 600,
+            color: active || unread ? C.ink : C.inkMid,
+            letterSpacing: "-0.01em",
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+          }}>
+            {name}
           </span>
-          <div style={{ display: "flex", gap: 4, alignItems: "center" }}>
-            {unread > 0 && (
-              <span style={{ background: C.primary, color: "#000", borderRadius: 10, fontSize: 9, fontWeight: 800, minWidth: 16, height: 16, display: "flex", alignItems: "center", justifyContent: "center", padding: "0 4px" }}>
-                {unread > 9 ? "9+" : unread}
-              </span>
-            )}
-            <Dot color={recetaColor} size={7} glow={active} />
-          </div>
+          <span style={{
+            fontSize: 10,
+            color: isCritical ? C.red : unread ? C.primary : C.inkFaint,
+            fontFamily: C.fontMono,
+            fontWeight: isCritical || unread ? 700 : 500,
+            fontVariantNumeric: "tabular-nums",
+            flexShrink: 0,
+          }}>
+            {relTime(lastMsg?.created_at)}
+          </span>
+        </div>
+
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+          <span style={{
+            fontSize: 12,
+            color: unread ? C.ink : C.inkFaint,
+            fontWeight: unread ? 600 : 400,
+            overflow: "hidden",
+            textOverflow: "ellipsis",
+            whiteSpace: "nowrap",
+            minWidth: 0,
+          }}>
+            {lastMsg?.remitente === "bot" && <span style={{ color: C.primary, fontWeight: 700 }}>IA: </span>}
+            {lastMsg?.remitente === "admin" && <span style={{ color: C.green, fontWeight: 700 }}>Op: </span>}
+            {preview}
+          </span>
+          {unread > 0 && (
+            <span style={{
+              minWidth: 18,
+              height: 18,
+              padding: "0 5px",
+              borderRadius: 9,
+              background: C.primary,
+              color: "#08090C",
+              fontSize: 10,
+              fontWeight: 800,
+              fontFamily: C.fontMono,
+              display: "inline-flex",
+              alignItems: "center",
+              justifyContent: "center",
+              flexShrink: 0,
+            }}>
+              {unread > 99 ? "99+" : unread}
+            </span>
+          )}
+        </div>
+
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginTop: 1 }}>
+          <StatusPill type={kind} />
+          {isCritical && (
+            <span style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              fontSize: 10,
+              color: C.red,
+              fontWeight: 700,
+              fontFamily: C.fontMono,
+            }}>
+              <span style={{ width: 4, height: 4, borderRadius: "50%", background: C.red }} />
+              ESPERANDO {Math.floor(waiting / 60)}m
+            </span>
+          )}
         </div>
       </div>
-      {lastMsg && (
-        <div style={{ fontSize: 11, color: unread > 0 ? C.inkMid : C.inkFaint, marginTop: 5, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", fontWeight: unread > 0 ? 600 : 400 }}>
-          {lastMsg.remitente === "bot" ? "🤖 " : lastMsg.remitente === "admin" ? "↳ " : ""}
-          {lastMsg.contenido}
-        </div>
-      )}
+    </button>
+  );
+}
+
+function ConvListHeader({ search, setSearch, filter, setFilter, count, totalUnread }) {
+  const filters = [
+    ["all", "Todas"],
+    ["unread", totalUnread > 0 ? `Sin leer ${totalUnread}` : "Sin leer"],
+    ["live", "En vivo"],
+    ["waiting", "Esperando"],
+  ];
+
+  return (
+    <div style={{
+      padding: "14px 14px 10px",
+      borderBottom: `1px solid ${C.border}`,
+      background: C.surface,
+      position: "sticky",
+      top: 0,
+      zIndex: 2,
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", marginBottom: 10 }}>
+        <h2 style={{ margin: 0, fontSize: 13, fontWeight: 700, color: C.ink, letterSpacing: "-0.01em" }}>
+          Conversaciones
+        </h2>
+        <span style={{ fontFamily: C.fontMono, fontSize: 11, color: C.inkFaint, fontVariantNumeric: "tabular-nums" }}>
+          {count}
+        </span>
+      </div>
+
+      <div style={{ position: "relative", marginBottom: 9 }}>
+        <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: C.inkFaint, pointerEvents: "none" }}>🔍</span>
+        <input
+          value={search}
+          onChange={e => setSearch(e.target.value)}
+          placeholder="Buscar..."
+          style={{ width: "100%", background: C.surfaceL, border: `1px solid ${C.border}`, color: C.ink, padding: "8px 10px 8px 28px", borderRadius: 8, outline: "none", fontSize: 12 }}
+        />
+      </div>
+
+      <div style={{ display: "flex", gap: 4, overflowX: "auto", scrollbarWidth: "none" }}>
+        {filters.map(([val, label]) => (
+          <button
+            key={val}
+            onClick={() => setFilter(val)}
+            className="auken-touch"
+            style={{
+              height: 26,
+              padding: "0 10px",
+              borderRadius: C.radiusSm,
+              background: filter === val ? C.surfaceL : "transparent",
+              color: filter === val ? C.ink : C.inkMid,
+              border: `1px solid ${filter === val ? C.border : "transparent"}`,
+              fontSize: 11,
+              fontWeight: 600,
+              cursor: "pointer",
+              whiteSpace: "nowrap",
+              transition: `all ${C.dur} ${C.ease}`,
+              flexShrink: 0,
+            }}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
     </div>
   );
 }
@@ -592,12 +810,9 @@ export default function AukenOptica() {
   const filtered = patients.filter(p => {
     const q = search.toLowerCase();
     if (q && !p.nombre?.toLowerCase().includes(q) && !p.telefono?.includes(q)) return false;
-    if (filter === "active")  return !!lastMsgs[p.id];
+    if (filter === "live")    return !!lastMsgs[p.id];
     if (filter === "unread")  return (unreadMap[p.id] || 0) > 0;
-    if (filter === "receta") {
-      const d = diasReceta(p.fecha_ultima_visita);
-      return d !== null && d > 335;
-    }
+    if (filter === "waiting") return waitingSeconds(lastMsgs[p.id]) > 0;
     return true;
   });
 
@@ -685,6 +900,7 @@ export default function AukenOptica() {
         @keyframes blink{0%,100%{opacity:1}50%{opacity:0.2}}
         @keyframes ping{0%{transform:scale(1);opacity:0.6}100%{transform:scale(2.5);opacity:0}}
         @keyframes slideIn{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:translateY(0)}}
+        @media (max-width: 768px){button.auken-touch{min-height:44px}}
       `}</style>
 
       {/* ── TOAST nueva msg ─────────────────────────────────────────────── */}
@@ -771,17 +987,17 @@ export default function AukenOptica() {
             boxShadow: showSidebar ? "8px 0 32px rgba(0,0,0,.6)" : "none",
           } : {}),
         }}>
-          {/* Buscador */}
-          <div style={{ padding: "10px 10px 6px" }}>
-            <div style={{ position: "relative" }}>
-              <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: C.inkFaint, pointerEvents: "none" }}>🔍</span>
-              <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar..."
-                style={{ width: "100%", background: C.surfaceL, border: `1px solid ${C.border}`, color: C.ink, padding: "7px 10px 7px 28px", borderRadius: 8, outline: "none", fontSize: 12 }} />
-            </div>
-          </div>
+          <ConvListHeader
+            search={search}
+            setSearch={setSearch}
+            filter={filter}
+            setFilter={setFilter}
+            count={filtered.length}
+            totalUnread={totalUnread}
+          />
 
           {/* Botón demo: simular cliente desconocido */}
-          <div style={{ padding: "0 10px 8px" }}>
+          <div style={{ padding: "10px 10px 8px" }}>
             <button onClick={crearDemoCliente} disabled={creandoDemo} style={{
               width: "100%",
               background: `linear-gradient(135deg, ${C.purple}25, ${C.neon}25)`,
@@ -794,22 +1010,6 @@ export default function AukenOptica() {
             title="Crea un paciente placeholder para probar el flujo de registro automático de la IA">
               {creandoDemo ? "Creando…" : "🎭 + Demo cliente nuevo"}
             </button>
-          </div>
-
-          {/* Filtros */}
-          <div style={{ display: "flex", gap: 4, padding: "0 10px 8px" }}>
-            {[["all","Todos"],["unread",`Sin leer${totalUnread>0?" ("+totalUnread+")":""}`],["active","Con chat"],["receta","Receta ⚠️"]].map(([val, label]) => (
-              <button key={val} onClick={() => setFilter(val)} style={{
-                flex: 1, fontSize: 9, fontWeight: 700, padding: "4px 2px", borderRadius: 5, cursor: "pointer", whiteSpace: "nowrap",
-                background: filter === val ? C.primary : C.surfaceL,
-                color: filter === val ? "#000" : C.inkFaint,
-                border: `1px solid ${filter === val ? C.primary : C.border}`,
-              }}>{label}</button>
-            ))}
-          </div>
-
-          <div style={{ padding: "0 18px 6px", fontSize: 10, color: C.inkFaint, fontWeight: 600 }}>
-            {filtered.length} canal{filtered.length !== 1 ? "es" : ""}
           </div>
 
           {/* Lista */}
