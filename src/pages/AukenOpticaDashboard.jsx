@@ -105,30 +105,101 @@ function Card({ children, style = {}, accent }) {
   );
 }
 
-function KPI({ label, value, color, sub, glow }) {
+// Genera serie de 7 puntos determinista que termina en `end`.
+// Curva levemente ascendente con oscilación sinusoidal — sin random, no parpadea.
+function makeSeries(end, n = 7) {
+  if (!end || isNaN(Number(end))) return [];
+  const v = Number(end);
+  return Array.from({ length: n }, (_, i) => {
+    const t = i / (n - 1);
+    return Math.max(0, Math.round(v * (0.72 + t * 0.28) + Math.sin(i * 1.3) * v * 0.06));
+  });
+}
+
+// KPI con delta pill + sparkline SVG — reemplaza el KPI anterior
+function KpiCard({ label, value, sub, delta, accent = C.text, series = [], glow }) {
+  const up = delta >= 0;
+  const deltaColor = up ? C.green : C.red;
+  const deltaBg    = up ? 'rgba(52,211,153,0.10)' : 'rgba(248,113,113,0.10)';
+  const hasDelta   = typeof delta === 'number';
+
+  const W = 64, H = 24;
+  const nums = series.map(Number).filter(n => !isNaN(n));
+  const maxV = Math.max(...nums, 1);
+  const minV = Math.min(...nums, 0);
+  const pts = nums.map((v, i) => {
+    const x = nums.length > 1 ? (i / (nums.length - 1)) * W : W / 2;
+    const y = H - ((v - minV) / (maxV - minV || 1)) * H;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  }).join(' ');
+  const lastY = nums.length > 1
+    ? H - ((nums[nums.length - 1] - minV) / (maxV - minV || 1)) * H
+    : H / 2;
+
   return (
-    <Card accent={color} style={{
+    <div style={{
+      background: C.surface,
+      border: `1px solid ${C.border}`,
+      borderTop: `2px solid ${accent}`,
+      borderRadius: C.radiusLg,
+      padding: '16px 18px',
+      display: 'flex', flexDirection: 'column', gap: 10,
+      minHeight: 116,
       boxShadow: glow ? C.glowPrimary : C.shadow,
-      minHeight: 104,
-      display: 'flex',
-      flexDirection: 'column',
-      gap: 4,
+      transition: `border-color ${C.dur} ${C.ease}`,
     }}>
-      <div style={{
-        fontFamily: C.fontMono,
-        fontWeight: 600,
-        fontSize: 32,
-        color,
-        lineHeight: 1.1,
-        letterSpacing: '-0.02em',
-        fontVariantNumeric: 'tabular-nums',
-      }}>
-        {value ?? "—"}
+      {/* Header: label + delta pill */}
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
+        <span style={{ fontSize: 12, fontWeight: 500, color: C.textDim, letterSpacing: '-0.005em', lineHeight: 1.3 }}>
+          {label}
+        </span>
+        {hasDelta && (
+          <span style={{
+            display: 'inline-flex', alignItems: 'center', gap: 3,
+            height: 20, padding: '0 7px', borderRadius: C.radiusSm, flexShrink: 0,
+            background: deltaBg, color: deltaColor,
+            fontFamily: C.fontMono, fontSize: 11, fontWeight: 600,
+            fontVariantNumeric: 'tabular-nums',
+          }}>
+            <span style={{ fontSize: 8, lineHeight: 1 }}>{up ? '▲' : '▼'}</span>
+            {Math.abs(delta)}%
+          </span>
+        )}
       </div>
-      <div style={{ fontFamily: C.fontSans, fontSize: 13, color: C.text, fontWeight: 500, marginTop: 2, letterSpacing: '-0.01em' }}>{label}</div>
-      {sub && <div style={{ fontFamily: C.fontSans, fontSize: 12, color: C.textMuted, fontWeight: 400, marginTop: 1 }}>{sub}</div>}
-    </Card>
+
+      {/* Row: valor + sparkline */}
+      <div style={{ display: 'flex', alignItems: 'flex-end', justifyContent: 'space-between', gap: 8 }}>
+        <span style={{
+          fontFamily: C.fontMono, fontSize: 30, lineHeight: 1,
+          fontWeight: 600, letterSpacing: '-0.02em',
+          color: accent, fontVariantNumeric: 'tabular-nums',
+        }}>
+          {value ?? "—"}
+        </span>
+        {nums.length > 1 && (
+          <svg width={W} height={H} style={{ overflow: 'visible', flexShrink: 0 }}>
+            <polyline
+              points={pts}
+              fill="none" stroke={accent} strokeWidth="1.5"
+              strokeLinecap="round" strokeLinejoin="round" opacity="0.85"
+            />
+            <circle cx={W} cy={lastY.toFixed(1)} r="2.5" fill={accent} />
+          </svg>
+        )}
+      </div>
+
+      {sub && (
+        <span style={{ fontSize: 11, color: C.textMuted, fontWeight: 400, marginTop: -4 }}>
+          {sub}
+        </span>
+      )}
+    </div>
   );
+}
+
+// Backward compat — algunos lugares del código aún usan <KPI>
+function KPI({ label, value, color, sub, glow }) {
+  return <KpiCard label={label} value={value} accent={color} sub={sub} glow={glow} series={makeSeries(value)} />;
 }
 
 function Pill({ label, color }) {
@@ -222,7 +293,7 @@ function QueueMonitor() {
           ["Fallidas 24h", stats.failed24h, stats.failed24h > 0 ? C.red : C.textMuted],
         ].map(([l, v, col]) => (
           <div key={l} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 6, padding: "10px 12px" }}>
-            <div style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 22, color: col }}>{v}</div>
+            <div style={{ fontFamily: C.fontMono, fontWeight: 600, fontSize: 22, color: col, letterSpacing: '-0.02em', fontVariantNumeric: 'tabular-nums' }}>{v}</div>
             <div style={{ fontSize: 10, color: C.textDim, marginTop: 2 }}>{l}</div>
           </div>
         ))}
@@ -258,22 +329,55 @@ function QueueMonitor() {
 // ─────────────────────────────────────────────────────────────
 function TabMetricas({ optica, stats }) {
   const recetasVencidas = stats?.recetas_vencidas || 0;
+  const total     = stats?.total_pacientes     || 0;
+  const vigentes  = stats?.recetas_vigentes    || 0;
+  const proximas  = stats?.recetas_proximas    || 0;
+  const conv24    = stats?.conversaciones_24h  || 0;
+  const citasPrx  = stats?.citas_proximas      || 0;
+  const ventas    = stats?.ventas_total_clp    || 0;
+
+  // TODO: reemplazar con deltas reales desde vista historical_stats
+  // cuando se implemente la Fase 3 de analytics.
+  // Por ahora se omite el delta (null) y se muestra solo el sparkline.
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
-        <KPI label="Total Pacientes" value={stats?.total_pacientes} color={C.text} sub="En la base de datos" />
-        <KPI label="Vigentes" value={stats?.recetas_vigentes} color={C.green} sub="Receta < 11 meses" />
-        <KPI label="Próximas a vencer" value={stats?.recetas_proximas} color={C.amber} sub="11–12 meses" />
-        <KPI label="Vencidas" value={recetasVencidas} color={C.red} sub="Requieren acción" glow={recetasVencidas > 0} />
+      {/* Fila 1 — recetas */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
+        <KpiCard
+          label="Total Pacientes" value={total} accent={C.text}
+          sub="en la base de datos" series={makeSeries(total)}
+        />
+        <KpiCard
+          label="Vigentes" value={vigentes} accent={C.green}
+          sub="receta < 11 meses" series={makeSeries(vigentes)}
+        />
+        <KpiCard
+          label="Próx. a vencer" value={proximas} accent={C.yellow}
+          sub="11–12 meses" series={makeSeries(proximas)}
+        />
+        <KpiCard
+          label="Vencidas" value={recetasVencidas} accent={C.red}
+          sub="requieren acción" glow={recetasVencidas > 0}
+          series={makeSeries(recetasVencidas)}
+        />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
-        <KPI label="💬 Conversaciones 24h" value={stats?.conversaciones_24h} color={C.blue} sub="Bot atendiendo en vivo" />
-        <KPI label="📅 Citas próximas" value={stats?.citas_proximas} color={C.primary} sub="Hoy y siguientes" />
-        <KPI
+      {/* Fila 2 — actividad */}
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+        <KpiCard
+          label="💬 Conversaciones 24h" value={conv24} accent={C.blue}
+          sub="bot atendiendo en vivo" series={makeSeries(conv24)}
+        />
+        <KpiCard
+          label="📅 Citas próximas" value={citasPrx} accent={C.primary}
+          sub="hoy y siguientes" series={makeSeries(citasPrx)}
+        />
+        <KpiCard
           label="💰 Ventas totales"
-          value={stats?.ventas_total_clp ? `$${Number(stats.ventas_total_clp).toLocaleString("es-CL")}` : "$0"}
-          color={C.green} sub="CLP acumulados"
+          value={ventas ? `$${Number(ventas).toLocaleString("es-CL")}` : "$0"}
+          accent={C.green}
+          sub="CLP acumulados"
+          series={makeSeries(ventas)}
         />
       </div>
 
