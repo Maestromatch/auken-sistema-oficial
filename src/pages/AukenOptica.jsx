@@ -576,7 +576,7 @@ export default function AukenOptica() {
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <button onClick={() => navigate("/optica/dashboard")}
+          <button onClick={() => { window.location.href = "/optica/dashboard"; }}
             style={{ background: `${C.primary}15`, color: C.primary, border: `1px solid ${C.primary}30`, borderRadius: 6, padding: "5px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center" }}>
             📊 Dashboard
           </button>
@@ -876,7 +876,7 @@ export default function AukenOptica() {
             <PatientPanel
               p={activeP}
               onClose={() => setShowPanel(false)}
-              onGoToDashboard={() => navigate("/optica/dashboard")}
+              onGoToDashboard={() => { window.location.href = "/optica/dashboard"; }}
             />
           </div>
         )}
