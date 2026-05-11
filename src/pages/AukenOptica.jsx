@@ -257,6 +257,7 @@ export default function AukenOptica() {
   const [newMsgAlert, setNewMsgAlert] = useState(null); // nombre del paciente con msg nuevo
   const [testMode,   setTestMode]   = useState(false);  // simula ser cliente, IA responde
   const [iaThinking, setIaThinking] = useState(false);
+  const [creandoDemo, setCreandoDemo] = useState(false);
 
   // ── Carga pacientes ──────────────────────────────────────────────────────────
   const refresh = useCallback(async () => {
@@ -284,6 +285,42 @@ export default function AukenOptica() {
     }
     setLoading(false);
   }, []);
+
+  // ── Demo: crear cliente placeholder para probar el flujo de registro IA ─────
+  const crearDemoCliente = useCallback(async () => {
+    setCreandoDemo(true);
+    try {
+      // Buscar la óptica para obtener optica_id
+      const { data: opticaRow } = await supabase.from("opticas")
+        .select("id").eq("slug", "glowvision").maybeSingle();
+
+      const fakePhone = `+5690000${String(Math.floor(Math.random() * 9000) + 1000)}`;
+      const { data: nuevo, error } = await supabase.from("pacientes").insert({
+        nombre: "Cliente Demo (sin registrar)",
+        telefono: fakePhone,
+        notas_clinicas: "Placeholder de prueba IA. El bot debería pedirle nombre/RUT y completar este registro automáticamente.",
+        tags: ["demo-pending"],
+        optica_id: opticaRow?.id,
+        estado_compra: "Pendiente",
+      }).select().maybeSingle();
+
+      if (error) { alert("No se pudo crear demo: " + error.message); return; }
+
+      // Activar el chat con este paciente + modo prueba IA
+      setActiveP(nuevo);
+      setTestMode(true);
+      setShowPanel(false);
+      setShowSidebar(false);
+      toast.info("Demo iniciada", {
+        sub: "Escribe como cliente — la IA pedirá tus datos y completará el registro automáticamente",
+        duration: 7000,
+      });
+    } catch (err) {
+      alert("Error creando demo: " + err.message);
+    } finally {
+      setCreandoDemo(false);
+    }
+  }, [toast]);
 
   // ── Carga chat ───────────────────────────────────────────────────────────────
   const loadChat = useCallback(async (pId) => {
@@ -513,7 +550,7 @@ export default function AukenOptica() {
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <button onClick={() => navigate("/optica/dashboard")}
+          <button onClick={() => { window.location.assign("/optica/dashboard"); }}
             style={{ background: `${C.primary}15`, color: C.primary, border: `1px solid ${C.primary}30`, borderRadius: 6, padding: "5px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
             📊 Dashboard
           </button>
@@ -559,6 +596,22 @@ export default function AukenOptica() {
               <input value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar..."
                 style={{ width: "100%", background: C.surfaceL, border: `1px solid ${C.border}`, color: C.ink, padding: "7px 10px 7px 28px", borderRadius: 8, outline: "none", fontSize: 12 }} />
             </div>
+          </div>
+
+          {/* Botón demo: simular cliente desconocido */}
+          <div style={{ padding: "0 10px 8px" }}>
+            <button onClick={crearDemoCliente} disabled={creandoDemo} style={{
+              width: "100%",
+              background: `linear-gradient(135deg, ${C.purple}25, ${C.neon}25)`,
+              border: `1px dashed ${C.purple}60`,
+              color: C.purple,
+              padding: "8px 12px", borderRadius: 8,
+              fontSize: 11, fontWeight: 700, cursor: creandoDemo ? "default" : "pointer",
+              opacity: creandoDemo ? 0.6 : 1, transition: "all 0.15s",
+            }}
+            title="Crea un paciente placeholder para probar el flujo de registro automático de la IA">
+              {creandoDemo ? "Creando…" : "🎭 + Demo cliente nuevo"}
+            </button>
           </div>
 
           {/* Filtros */}
@@ -797,7 +850,7 @@ export default function AukenOptica() {
             <PatientPanel
               p={activeP}
               onClose={() => setShowPanel(false)}
-              onGoToDashboard={() => window.open("/optica/dashboard", "_blank")}
+              onGoToDashboard={() => { window.location.assign("/optica/dashboard"); }}
             />
           </div>
         )}

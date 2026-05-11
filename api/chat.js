@@ -163,16 +163,33 @@ export default async function handler(req, res) {
 }
 
 async function executeWebAction(supabase, action, phone, paciente, opticaCfg) {
-  if (action.type === "register" && !paciente) {
-    await supabase.from("pacientes").insert({
-      nombre: action.nombre,
-      rut: action.rut,
-      telefono: phone !== "web-anonymous" ? phone : null,
-      notas_clinicas: `Captado por chat web. Comuna: ${action.comuna}`,
-      fecha_ultima_visita: new Date().toISOString().split("T")[0],
-      tags: ["lead-web"],
-      optica_id: opticaCfg?.id,
-    });
+  if (action.type === "register") {
+    const isDemoPending = Array.isArray(paciente?.tags) && paciente.tags.includes("demo-pending");
+
+    if (!paciente) {
+      // Crear paciente nuevo (caso normal: cliente desconocido en WhatsApp)
+      const { data } = await supabase.from("pacientes").insert({
+        nombre: action.nombre,
+        rut: action.rut,
+        telefono: phone !== "web-anonymous" ? phone : null,
+        notas_clinicas: `Captado por chat. Comuna: ${action.comuna}`,
+        fecha_ultima_visita: new Date().toISOString().split("T")[0],
+        tags: ["lead-web"],
+        optica_id: opticaCfg?.id,
+      }).select().maybeSingle();
+      return { type: "registered", paciente: data };
+    } else if (isDemoPending) {
+      // Actualizar el placeholder demo con los datos reales
+      const newTags = (paciente.tags || []).filter(t => t !== "demo-pending");
+      newTags.push("lead-demo");
+      const { data } = await supabase.from("pacientes").update({
+        nombre: action.nombre || paciente.nombre,
+        rut: action.rut || paciente.rut,
+        notas_clinicas: `${paciente.notas_clinicas || ""}\nDatos completados vía demo IA. Comuna: ${action.comuna}`.trim(),
+        tags: newTags,
+      }).eq("id", paciente.id).select().maybeSingle();
+      return { type: "registered", paciente: data };
+    }
   }
 
   if (action.type === "escalate" && phone !== "web-anonymous") {

@@ -76,7 +76,8 @@ export async function loadOpticaConfig(supabase, slug = "glowvision") {
  */
 export function buildSystemPrompt(paciente, canal = "whatsapp", summary = null, opticaCfg = null) {
   const o = opticaCfg || OPTICA_FALLBACK;
-  const esRegistrado = !!paciente;
+  const isDemoPending = Array.isArray(paciente?.tags) && paciente.tags.includes("demo-pending");
+  const esRegistrado = !!paciente && !isDemoPending;
   const recetaVencida = paciente?.estado_receta === "vencida";
   const proximoControl = paciente?.estado_receta === "proxima";
 

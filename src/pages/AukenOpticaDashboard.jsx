@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useToaster } from "../components/Toaster";
+import { useViewport } from "../lib/useViewport";
 
 // =============================================================
 // AUKÉN OPTICA DASHBOARD — versión limpia
@@ -155,7 +156,7 @@ function QueueMonitor() {
         </button>
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 8, marginBottom: 16 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 8, marginBottom: 16 }}>
         {[
           ["Pendientes", stats.pending, stats.pending > 20 ? C.amber : C.blue],
           ["Procesando", stats.processing, C.blue],
@@ -201,14 +202,14 @@ function TabMetricas({ optica, stats }) {
   const recetasVencidas = stats?.recetas_vencidas || 0;
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(4, 1fr)", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))", gap: 12 }}>
         <KPI label="Total Pacientes" value={stats?.total_pacientes} color={C.text} sub="En la base de datos" />
         <KPI label="Vigentes" value={stats?.recetas_vigentes} color={C.green} sub="Receta < 11 meses" />
         <KPI label="Próximas a vencer" value={stats?.recetas_proximas} color={C.amber} sub="11–12 meses" />
         <KPI label="Vencidas" value={recetasVencidas} color={C.red} sub="Requieren acción" glow={recetasVencidas > 0} />
       </div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 12 }}>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))", gap: 12 }}>
         <KPI label="💬 Conversaciones 24h" value={stats?.conversaciones_24h} color={C.blue} sub="Bot atendiendo en vivo" />
         <KPI label="📅 Citas próximas" value={stats?.citas_proximas} color={C.primary} sub="Hoy y siguientes" />
         <KPI
@@ -403,7 +404,7 @@ function CitaModal({ opticaId, pacientes, onClose, refresh }) {
             </div>
           )}
 
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
             <input placeholder="Nombre del paciente *" value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })}
               style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13 }} />
             <input placeholder="+569..." value={form.telefono} onChange={e => setForm({ ...form, telefono: e.target.value })}
@@ -413,7 +414,7 @@ function CitaModal({ opticaId, pacientes, onClose, refresh }) {
           <input placeholder="Servicio (ej: Examen visual, Lentes de contacto...)" value={form.servicio} onChange={e => setForm({ ...form, servicio: e.target.value })}
             style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13 }} />
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
             <div>
               <div style={{ fontSize: 10, color: C.textDim, marginBottom: 4, textTransform: "uppercase", fontWeight: 700 }}>Fecha *</div>
               <input type="date" value={form.fecha} onChange={e => setForm({ ...form, fecha: e.target.value })}
@@ -616,17 +617,17 @@ function TabConfiguracion({ optica, refresh }) {
       </div>
 
       <div style={{ display: "grid", gap: 16 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
           <Field label="Nombre comercial" value={edit.nombre} onChange={v => setEdit({ ...edit, nombre: v })} ph="Óptica Glow Vision" />
           <Field label="Slogan" value={edit.slogan} onChange={v => setEdit({ ...edit, slogan: v })} ph="calidad que inspira" />
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
           <Field label="Dirección" value={edit.direccion} onChange={v => setEdit({ ...edit, direccion: v })} ph="Caupolicán #763" />
           <Field label="Ciudad" value={edit.ciudad} onChange={v => setEdit({ ...edit, ciudad: v })} ph="Punitaqui" />
         </div>
 
-        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
           <Field label="Teléfono general" value={edit.telefono} onChange={v => setEdit({ ...edit, telefono: v })} ph="+56 9 5493 2802" />
           <Field label="WhatsApp escalada (dueño)" value={edit.numero_escalada} onChange={v => setEdit({ ...edit, numero_escalada: v })} ph="+56954932802" />
         </div>
@@ -795,14 +796,14 @@ function PatientModal({ patient, opticaId, onClose, refresh }) {
             <input type="file" accept="image/*" style={{ display: "none" }} onChange={scanReceta} disabled={scanning} />
           </label>
 
-          <div style={{ display: "grid", gridTemplateColumns: "2fr 1fr", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
             <input placeholder="Nombre completo *" value={edit.nombre || ""} onChange={(e) => setEdit({ ...edit, nombre: e.target.value })}
               style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13 }} />
             <input placeholder="RUT" value={edit.rut || ""} onChange={(e) => setEdit({ ...edit, rut: e.target.value })}
               style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13 }} />
           </div>
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
             <input placeholder="Teléfono (+569...)" value={edit.telefono || ""} onChange={(e) => setEdit({ ...edit, telefono: e.target.value })}
               style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13 }} />
             <input placeholder="Comuna" value={edit.comuna || ""} onChange={(e) => setEdit({ ...edit, comuna: e.target.value })}
@@ -812,7 +813,7 @@ function PatientModal({ patient, opticaId, onClose, refresh }) {
           <input placeholder="Producto Actual (Ej: Multifocales Blue)" value={edit.producto_actual || ""} onChange={(e) => setEdit({ ...edit, producto_actual: e.target.value })}
             style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13 }} />
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
             <div>
               <div style={{ fontSize: 10, color: C.textDim, marginBottom: 4, textTransform: "uppercase", fontWeight: 700 }}>Última Visita</div>
               <input type="date" value={edit.fecha_ultima_visita || ""} onChange={(e) => setEdit({ ...edit, fecha_ultima_visita: e.target.value })}
@@ -828,7 +829,7 @@ function PatientModal({ patient, opticaId, onClose, refresh }) {
           <textarea placeholder="Notas clínicas" rows={3} value={edit.notas_clinicas || ""} onChange={(e) => setEdit({ ...edit, notas_clinicas: e.target.value })}
             style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "inherit", resize: "none" }} />
 
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10 }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
             <select value={edit.estado_compra || "Pendiente"} onChange={(e) => setEdit({ ...edit, estado_compra: e.target.value })}
               style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13 }}>
               <option>Pendiente</option><option>Compró</option><option>No Compró</option>
@@ -899,6 +900,7 @@ function PatientModal({ patient, opticaId, onClose, refresh }) {
 // =============================================================
 export default function AukenOpticaDashboard() {
   const navigate = useNavigate();
+  const { isMobile, isTablet } = useViewport();
 
   // ⚠️ FIX: Todos los useState ANTES de cualquier useEffect
   const [tab, setTab] = useState("metricas");
@@ -1041,31 +1043,42 @@ export default function AukenOpticaDashboard() {
       {/* TOPNAV */}
       <nav style={{
         background: `${C.surface}E6`, backdropFilter: "blur(12px)",
-        borderBottom: `1px solid ${C.border}`, padding: "0 32px",
-        height: 60, display: "flex", alignItems: "center", justifyContent: "space-between",
-        position: "sticky", top: 0, zIndex: 50,
+        borderBottom: `1px solid ${C.border}`, padding: isMobile ? "0 12px" : "0 32px",
+        height: isMobile ? 52 : 60, display: "flex", alignItems: "center", justifyContent: "space-between",
+        position: "sticky", top: 0, zIndex: 50, gap: 8,
       }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ width: 32, height: 32, background: `linear-gradient(135deg, ${C.primary}, ${C.primaryD})`, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 16 }}>👁️</div>
-          <span style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: 18 }}>{optica?.nombre || "AUKÉN"}</span>
-          <span style={{ color: C.textMuted, margin: "0 8px" }}>·</span>
-          <span style={{ fontSize: 12, color: C.textDim }}>Dashboard</span>
+        <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+          <div style={{ width: isMobile ? 28 : 32, height: isMobile ? 28 : 32, background: `linear-gradient(135deg, ${C.primary}, ${C.primaryD})`, borderRadius: 8, display: "flex", alignItems: "center", justifyContent: "center", fontSize: isMobile ? 14 : 16, flexShrink: 0 }}>👁️</div>
+          <span style={{ fontFamily: "'Outfit', sans-serif", fontWeight: 700, fontSize: isMobile ? 14 : 18, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{optica?.nombre || "AUKÉN"}</span>
+          {!isMobile && (
+            <>
+              <span style={{ color: C.textMuted, margin: "0 4px" }}>·</span>
+              <span style={{ fontSize: 12, color: C.textDim }}>Dashboard</span>
+            </>
+          )}
         </div>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: C.green, fontWeight: 600, background: `${C.green}10`, padding: "4px 10px", borderRadius: 16 }}>
-            <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.green, boxShadow: `0 0 6px ${C.green}` }} />
-            Activo
-          </div>
+        <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 6 : 12, flexShrink: 0 }}>
+          <button onClick={() => navigate("/optica")}
+            title="Ir al monitor de conversaciones"
+            style={{ background: `${C.primary}15`, border: `1px solid ${C.primary}40`, color: C.primary, borderRadius: 6, padding: isMobile ? "5px 10px" : "6px 12px", fontSize: isMobile ? 11 : 12, fontWeight: 700, cursor: "pointer" }}>
+            💬 {isMobile ? "" : "Chat"}
+          </button>
+          {!isMobile && (
+            <div style={{ display: "flex", alignItems: "center", gap: 6, fontSize: 12, color: C.green, fontWeight: 600, background: `${C.green}10`, padding: "4px 10px", borderRadius: 16 }}>
+              <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.green, boxShadow: `0 0 6px ${C.green}` }} />
+              Activo
+            </div>
+          )}
           <button onClick={() => { localStorage.removeItem("auken_auth"); navigate("/login"); }}
-            style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textDim, borderRadius: 6, padding: "6px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer" }}>
-            Cerrar sesión
+            style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textDim, borderRadius: 6, padding: isMobile ? "5px 10px" : "6px 12px", fontSize: isMobile ? 11 : 12, fontWeight: 600, cursor: "pointer", whiteSpace: "nowrap" }}>
+            {isMobile ? "Salir" : "Cerrar sesión"}
           </button>
         </div>
       </nav>
 
       {/* TABS */}
-      <div style={{ padding: "24px 32px 0", maxWidth: 1200, margin: "0 auto" }}>
-        <div style={{ display: "flex", gap: 6, borderBottom: `1px solid ${C.border}`, paddingBottom: 12, marginBottom: 24 }}>
+      <div style={{ padding: isMobile ? "16px 12px 0" : "24px 32px 0", maxWidth: 1200, margin: "0 auto" }}>
+        <div style={{ display: "flex", gap: 6, borderBottom: `1px solid ${C.border}`, paddingBottom: 12, marginBottom: 16, overflowX: "auto", scrollbarWidth: "none" }}>
           {[
             ["metricas", "📊 Métricas"],
             ["pacientes", `👥 Pacientes (${pacientes.length})`],
