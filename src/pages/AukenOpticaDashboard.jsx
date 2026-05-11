@@ -202,6 +202,59 @@ function KPI({ label, value, color, sub, glow }) {
   return <KpiCard label={label} value={value} accent={color} sub={sub} glow={glow} series={makeSeries(value)} />;
 }
 
+// ─────────────────────────────────────────────────────────────
+// EMPTY STATE — cuadrícula con nodo pulsante (Linear/Vercel style)
+// ─────────────────────────────────────────────────────────────
+function EmptyState({ title, body, cta, onCta, accent = C.primary }) {
+  return (
+    <div style={{
+      display: 'flex', flexDirection: 'column', alignItems: 'center',
+      justifyContent: 'center', padding: '40px 24px', textAlign: 'center', gap: 14,
+    }}>
+      {/* Ilustración: cuadrícula 3×3 con nodo central pulsante */}
+      <div style={{
+        position: 'relative', width: 64, height: 64,
+        display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6,
+      }}>
+        <style>{`@keyframes auken-pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.18);opacity:.65}}`}</style>
+        {Array.from({ length: 9 }).map((_, i) => (
+          <div key={i} style={{
+            borderRadius: 4,
+            background: i === 4 ? accent : C.surfaceL,
+            border: i === 4 ? 'none' : `1px solid ${C.border}`,
+            boxShadow: i === 4 ? `0 0 14px ${accent}55` : 'none',
+            animation: i === 4 ? 'auken-pulse 2.4s ease-in-out infinite' : 'none',
+          }} />
+        ))}
+      </div>
+
+      <div style={{ display: 'flex', flexDirection: 'column', gap: 5, maxWidth: 300 }}>
+        <span style={{ fontSize: 14, fontWeight: 600, color: C.text, letterSpacing: '-0.01em' }}>
+          {title}
+        </span>
+        <span style={{ fontSize: 12, color: C.textDim, lineHeight: 1.6 }}>{body}</span>
+      </div>
+
+      {cta && (
+        <button
+          onClick={onCta}
+          style={{
+            marginTop: 2, height: 30, padding: '0 14px',
+            background: 'transparent', color: accent,
+            border: `1px solid ${accent}55`, borderRadius: C.radius,
+            fontSize: 12, fontWeight: 600, cursor: 'pointer',
+            transition: `all ${C.dur} ${C.ease}`,
+          }}
+          onMouseEnter={e => { e.currentTarget.style.background = `${accent}15`; e.currentTarget.style.borderColor = accent; }}
+          onMouseLeave={e => { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.borderColor = `${accent}55`; }}
+        >
+          {cta}
+        </button>
+      )}
+    </div>
+  );
+}
+
 function Pill({ label, color }) {
   return (
     <span style={{
@@ -301,7 +354,15 @@ function QueueMonitor() {
 
       <div style={{ fontSize: 11, color: C.textMuted, textTransform: "uppercase", fontWeight: 600, marginBottom: 8 }}>Últimos mensajes</div>
       <div style={{ maxHeight: 180, overflowY: "auto", display: "flex", flexDirection: "column", gap: 4 }}>
-        {recent.length === 0 && <div style={{ color: C.textMuted, fontSize: 12, padding: 12, textAlign: "center" }}>Sin mensajes recientes</div>}
+        {recent.length === 0 && (
+          <EmptyState
+            title="Bot en standby"
+            body="No hay conversaciones activas. Cuando un paciente escriba por WhatsApp aparecerá aquí en tiempo real."
+            cta="Abrir Monitor →"
+            onCta={() => { window.location.href = "/optica"; }}
+            accent={C.green}
+          />
+        )}
         {recent.map((m, i) => {
           const col = m.status === "done" ? C.green : m.status === "failed" ? C.red : m.status === "processing" ? C.amber : C.blue;
           return (
@@ -432,9 +493,15 @@ function TabPacientes({ optica, pacientes, refresh, handleSendWhatsApp, onEdit, 
       {isMobile ? (
         <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
           {filtered.length === 0 && (
-            <div style={{ padding: 24, textAlign: "center", color: C.textDim, fontSize: 13 }}>
-              {search ? `Sin resultados para "${search}"` : "Sin pacientes aún."}
-            </div>
+            search
+              ? <div style={{ padding: 24, textAlign: "center", color: C.textDim, fontSize: 13 }}>Sin resultados para "<strong style={{ color: C.text }}>{search}</strong>"</div>
+              : <EmptyState
+                  title="Sin pacientes todavía"
+                  body="El bot los captura automáticamente desde WhatsApp, o agrégalos tú manualmente."
+                  cta="+ Agregar paciente"
+                  onCta={onCreate}
+                  accent={C.primary}
+                />
           )}
           {filtered.map(p => {
             const dias = p.fecha_ultima_visita
@@ -481,8 +548,17 @@ function TabPacientes({ optica, pacientes, refresh, handleSendWhatsApp, onEdit, 
             </thead>
             <tbody>
               {filtered.length === 0 && (
-                <tr><td colSpan="5" style={{ padding: "40px", textAlign: "center", color: C.textDim, fontSize: 13 }}>
-                  {search ? `Sin resultados para "${search}"` : "Aún no hay pacientes. Agrega el primero arriba o captúralos automáticamente desde WhatsApp."}
+                <tr><td colSpan="5">
+                  {search
+                    ? <div style={{ padding: 32, textAlign: "center", color: C.textDim, fontSize: 13 }}>Sin resultados para "<strong style={{ color: C.text }}>{search}</strong>"</div>
+                    : <EmptyState
+                        title="Sin pacientes todavía"
+                        body="El bot los captura automáticamente cuando llegan por WhatsApp. También puedes agregar el primero manualmente."
+                        cta="+ Agregar paciente"
+                        onCta={onCreate}
+                        accent={C.primary}
+                      />
+                  }
                 </td></tr>
               )}
               {filtered.map(p => {
@@ -701,9 +777,13 @@ function TabCitas({ citas, refresh, optica, pacientes }) {
         {isMobile ? (
           <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
             {citas.length === 0 && (
-              <div style={{ padding: 24, textAlign: "center", color: C.textDim, fontSize: 13 }}>
-                No hay citas. Usa "+ Nueva Cita" para agregar.
-              </div>
+              <EmptyState
+                title="Agenda limpia"
+                body="El bot agenda automáticamente cuando conversa con un paciente. También puedes crear una cita manualmente."
+                cta="+ Nueva Cita"
+                onCta={() => setShowModal(true)}
+                accent={C.blue}
+              />
             )}
             {citas.map(c => {
               const estadoColor = c.estado === "confirmada" ? C.green
@@ -767,8 +847,14 @@ function TabCitas({ citas, refresh, optica, pacientes }) {
               </thead>
               <tbody>
                 {citas.length === 0 && (
-                  <tr><td colSpan="6" style={{ padding: 32, textAlign: "center", color: C.textDim, fontSize: 13 }}>
-                    No hay citas agendadas. Usa "+ Nueva Cita" para agregar una manualmente.
+                  <tr><td colSpan="6">
+                    <EmptyState
+                      title="Agenda limpia"
+                      body="El bot agenda automáticamente. También puedes crear una cita manualmente con el botón superior."
+                      cta="+ Nueva Cita"
+                      onCta={() => setShowModal(true)}
+                      accent={C.blue}
+                    />
                   </td></tr>
                 )}
                 {citas.map(c => {
@@ -1410,10 +1496,13 @@ function TabEnVivo({ citas, optica }) {
             <div style={{ color: C.textMuted, fontSize: 12, textAlign: "center", padding: 24 }}>Cargando mensajes...</div>
           )}
           {!loadingMsgs && !loadError && mensajes.length === 0 && (
-            <div style={{ color: C.textMuted, fontSize: 12, textAlign: "center", padding: 24 }}>
-              Sin mensajes aún.<br />
-              <span style={{ fontSize: 11 }}>Prueba el chat desde el Monitor. Los mensajes aparecerán aquí.</span>
-            </div>
+            <EmptyState
+              title="Chat en espera"
+              body="Sin mensajes aún. Prueba el bot desde el Monitor o espera a que un paciente escriba por WhatsApp."
+              cta="Abrir Monitor"
+              onCta={() => { window.location.href = "/optica"; }}
+              accent={C.primary}
+            />
           )}
           {mensajes.map((m, i) => {
             const isBot = m.remitente === "bot";
@@ -1472,10 +1561,11 @@ function TabEnVivo({ citas, optica }) {
 
         <div style={{ height: isMobile ? 300 : 440, overflowY: "auto", padding: "12px 14px", display: "flex", flexDirection: "column", gap: 8 }}>
           {citasProximas.length === 0 && (
-            <div style={{ color: C.textMuted, fontSize: 12, textAlign: "center", padding: 24 }}>
-              No hay citas próximas.<br />
-              <span style={{ fontSize: 11 }}>Las citas agendadas aparecerán aquí.</span>
-            </div>
+            <EmptyState
+              title="Agenda despejada"
+              body="No hay citas programadas próximamente. El bot las agenda automáticamente o créalas desde el tab Citas."
+              accent={C.blue}
+            />
           )}
           {citasProximas.map((c, i) => {
             const isToday = c.fecha === today;
