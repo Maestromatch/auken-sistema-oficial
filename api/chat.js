@@ -111,7 +111,7 @@ export default async function handler(req, res) {
             const dateObj = new Date(`${ar.cita.fecha}T${horaSafe}:00`);
             const fechaFmt = isNaN(dateObj.getTime())
               ? `${ar.cita.fecha} a las ${horaSafe}`
-              : dateObj.toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" });
+              : formatLongDateCL(dateObj);
 
             const calLink = buildGoogleCalLink({
               title: `${opticaCfg?.nombre || "Aukén"} — ${ar.cita.servicio}`,
@@ -259,7 +259,7 @@ async function executeWebAction(supabase, action, phone, paciente, opticaCfg) {
  */
 function normalizeDate(input) {
   if (!input) return null;
-  const text = String(input).trim().toLowerCase();
+  const text = stripAccents(String(input).trim().toLowerCase().replace(/,/g, " "));
 
   // Ya viene en formato ISO
   if (/^\d{4}-\d{2}-\d{2}$/.test(text)) return text;
@@ -269,6 +269,18 @@ function normalizeDate(input) {
   if (m) {
     const [_, d, mo, y] = m;
     return `${y}-${mo.padStart(2,"0")}-${d.padStart(2,"0")}`;
+  }
+
+  const monthNames = {
+    enero: 1, febrero: 2, marzo: 3, abril: 4, mayo: 5, junio: 6,
+    julio: 7, agosto: 8, septiembre: 9, setiembre: 9, octubre: 10, noviembre: 11, diciembre: 12,
+  };
+  const longDate = text.match(/^(\d{1,2})(?:\s+de)?\s+([a-z]+)(?:\s+de)?(?:\s+(\d{4}))?/);
+  if (longDate && monthNames[longDate[2]]) {
+    const day = longDate[1].padStart(2, "0");
+    const month = String(monthNames[longDate[2]]).padStart(2, "0");
+    const year = longDate[3] || String(new Date().getFullYear());
+    return `${year}-${month}-${day}`;
   }
 
   const today = new Date();
@@ -306,12 +318,27 @@ function normalizeDate(input) {
 
 function normalizeHora(input) {
   if (!input) return "12:00";
-  const text = String(input).trim().toLowerCase();
+  const text = stripAccents(String(input).trim().toLowerCase())
+    .replace(/^a\s+las?\s+/, "")
+    .replace(/\b(hrs?|horas?)\b/g, "")
+    .trim();
+  const tarde = /\b(pm|tarde|noche)\b/.test(text);
+  const manana = /\b(am|manana)\b/.test(text);
+
+  const mTarde = text.match(/^(\d{1,2})(?::?(\d{2}))?\s*(pm|tarde|noche)$/);
+  if (mTarde) {
+    let h = parseInt(mTarde[1], 10);
+    if (h < 12) h += 12;
+    const min = mTarde[2] || "00";
+    return `${String(h).padStart(2,"0")}:${min}`;
+  }
+
   // 17:00, 17:30, 09:00
   const m = text.match(/^(\d{1,2}):?(\d{2})?$/);
   if (m) {
-    const h = parseInt(m[1], 10);
+    let h = parseInt(m[1], 10);
     const min = m[2] || "00";
+    if (!manana && (tarde || (h >= 1 && h <= 7))) h += 12;
     return `${String(h).padStart(2,"0")}:${min}`;
   }
   // "5pm", "10am"
@@ -323,6 +350,20 @@ function normalizeHora(input) {
     return `${String(h).padStart(2,"0")}:00`;
   }
   return "12:00";
+}
+
+function stripAccents(text) {
+  return String(text).normalize("NFD").replace(/[\u0300-\u036f]/g, "");
+}
+
+function formatLongDateCL(dateObj) {
+  const base = dateObj.toLocaleDateString("es-CL", {
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  });
+  const weekday = dateObj.toLocaleDateString("es-CL", { weekday: "long" });
+  return `${base}, ${weekday}`;
 }
 
 function toISO(d) {

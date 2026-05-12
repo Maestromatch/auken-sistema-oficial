@@ -90,6 +90,16 @@ function goDashboard(e) {
   }
 }
 
+function dedupeMessages(list = []) {
+  const seen = new Set();
+  return list.filter((m) => {
+    const key = m.id || `${m.paciente_id}-${m.remitente}-${m.created_at}-${m.contenido}`;
+    if (seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function fmtTime(ts) {
   if (!ts) return "";
   const d = new Date(ts), now = new Date(), diff = (now - d) / 1000;
@@ -563,7 +573,7 @@ function PatientPanel({ p, onClose, onGoToDashboard }) {
 
       {/* Acciones */}
       <div style={{ padding: "14px 16px", borderTop: `1px solid ${C.border}`, display: "flex", flexDirection: "column", gap: 7 }}>
-        <a href={dashboardUrl()} onMouseDown={onGoToDashboard} onClick={onGoToDashboard} style={{
+        <a href={DASHBOARD_PATH} onClick={onGoToDashboard} style={{
           background: `${C.primary}15`, color: C.primary, border: `1px solid ${C.primary}35`,
           borderRadius: 8, padding: "8px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer",
           width: "100%", textAlign: "center", textDecoration: "none", display: "block", position: "relative", zIndex: 5,
@@ -584,6 +594,7 @@ export default function AukenOptica() {
   const navigate = useNavigate();
   const bottomRef  = useRef(null);
   const inputRef   = useRef(null);
+  const sendingRef = useRef(false);
   const { isMobile, isTablet } = useViewport();
   const { toast } = useToaster();
   const [showSidebar, setShowSidebar] = useState(false); // móvil: drawer cerrado por defecto
@@ -604,6 +615,15 @@ export default function AukenOptica() {
   const [filter,     setFilter]     = useState("all");
   const [showQuick,  setShowQuick]  = useState(false);
   const [newMsgAlert, setNewMsgAlert] = useState(null); // nombre del paciente con msg nuevo
+
+  const openDashboard = useCallback((e) => {
+    e?.preventDefault?.();
+    e?.stopPropagation?.();
+    try {
+      localStorage.setItem("auken_auth", "true");
+    } catch {}
+    navigate(DASHBOARD_PATH);
+  }, [navigate]);
   const [testMode,   setTestMode]   = useState(false);  // simula ser cliente, IA responde
   const [iaThinking, setIaThinking] = useState(false);
   const [creandoDemo, setCreandoDemo] = useState(false);
@@ -675,7 +695,7 @@ export default function AukenOptica() {
   const loadChat = useCallback(async (pId) => {
     if (!pId) return;
     const { data } = await supabase.from("mensajes_chat").select("*").eq("paciente_id", pId).order("created_at", { ascending: true });
-    setMessages(data || []);
+    setMessages(dedupeMessages(data || []));
     // Marcar como leído
     const now = new Date().toISOString();
     const updated = { ...JSON.parse(localStorage.getItem("auken_seen") || "{}"), [pId]: now };
@@ -697,7 +717,7 @@ export default function AukenOptica() {
         const m = payload.new;
         setLastMsgs(prev => ({ ...prev, [m.paciente_id]: m }));
         if (activeP && m.paciente_id === activeP.id) {
-          setMessages(prev => [...prev, m]);
+          setMessages(prev => dedupeMessages([...prev, m]));
         } else if (m.remitente === "cliente") {
           setUnreadMap(prev => ({ ...prev, [m.paciente_id]: (prev[m.paciente_id] || 0) + 1 }));
           // Alerta visual + toast notificación
@@ -740,7 +760,8 @@ export default function AukenOptica() {
 
   // ── Enviar ───────────────────────────────────────────────────────────────────
   const handleSend = async () => {
-    if (!inputText.trim() || !activeP || sending) return;
+    if (!inputText.trim() || !activeP || sending || sendingRef.current) return;
+    sendingRef.current = true;
     const text = inputText.trim();
     setSending(true);
 
@@ -749,7 +770,7 @@ export default function AukenOptica() {
       const { error: e1 } = await supabase.from("mensajes_chat").insert([{
         paciente_id: activeP.id, remitente: "cliente", contenido: text,
       }]);
-      if (e1) { alert("Error guardando mensaje: " + e1.message); setSending(false); return; }
+      if (e1) { alert("Error guardando mensaje: " + e1.message); setSending(false); sendingRef.current = false; return; }
       setInputText("");
       await loadChat(activeP.id);
 
@@ -790,12 +811,14 @@ export default function AukenOptica() {
       }
       setIaThinking(false);
       setSending(false);
+      sendingRef.current = false;
     } else {
       // Modo normal: operador responde como humano
       const { error } = await supabase.from("mensajes_chat").insert([{
         paciente_id: activeP.id, remitente: "admin", contenido: text,
       }]);
       setSending(false);
+      sendingRef.current = false;
       if (!error) { setInputText(""); loadChat(activeP.id); }
     }
   };
@@ -948,7 +971,7 @@ export default function AukenOptica() {
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <a href={dashboardUrl()} onMouseDown={goDashboard} onClick={goDashboard}
+          <a href={DASHBOARD_PATH} onClick={openDashboard}
             style={{ background: `${C.primary}15`, color: C.primary, border: `1px solid ${C.primary}30`, borderRadius: 6, padding: "5px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", textDecoration: "none", position: "relative", zIndex: 5 }}>
             📊 Dashboard
           </a>
@@ -1165,7 +1188,12 @@ export default function AukenOptica() {
                   <input ref={inputRef}
                     value={inputText}
                     onChange={e => setInputText(e.target.value)}
-                    onKeyDown={e => e.key === "Enter" && !e.shiftKey && handleSend()}
+                    onKeyDown={e => {
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        handleSend();
+                      }
+                    }}
                     placeholder={testMode ? "Escribe como cliente para probar la IA..." : "Responder como operador..."}
                     style={{ flex: 1, background: "transparent", border: "none", color: C.ink, outline: "none", fontSize: 13 }}
                   />
@@ -1217,7 +1245,7 @@ export default function AukenOptica() {
             <PatientPanel
               p={activeP}
               onClose={() => setShowPanel(false)}
-              onGoToDashboard={goDashboard}
+              onGoToDashboard={openDashboard}
             />
           </div>
         )}

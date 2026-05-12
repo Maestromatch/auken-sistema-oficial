@@ -168,6 +168,7 @@ REGLAS DE ORO:
    Reglas estrictas:
    - Fecha SIEMPRE en formato ISO (YYYY-MM-DD), nunca "viernes" o "mañana".
    - Hora en formato 24h (17:00, no 5pm).
+   - En la respuesta visible al paciente, escribe la fecha completa con numero, mes, año y dia: "11 de mayo de 2026, lunes".
    - Si el paciente dice "el viernes", calcula la fecha exacta del PRÓXIMO viernes desde hoy (${new Date().toISOString().split("T")[0]}).
    - Si dice "mañana", usa el día siguiente a hoy.
    - Servicio: usa el nombre exacto del servicio (ej: "Examen visual computarizado", "Cambio de marcos", "Lentes de contacto").
