@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback, useRef } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useToaster } from "../components/Toaster";
+import Icon from "../components/Icon";
 
 // Hook responsive — detecta tamaño de pantalla
 function useViewport() {
@@ -452,7 +453,7 @@ function ConvListHeader({ search, setSearch, filter, setFilter, count, totalUnre
       </div>
 
       <div style={{ position: "relative", marginBottom: 9 }}>
-        <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", fontSize: 11, color: C.inkFaint, pointerEvents: "none" }}>🔍</span>
+        <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: C.inkFaint, pointerEvents: "none", display: "inline-flex" }}><Icon name="search" size={12} /></span>
         <input
           value={search}
           onChange={e => setSearch(e.target.value)}
@@ -550,7 +551,7 @@ function PatientPanel({ p, onClose, onGoToDashboard }) {
         {/* Receta OCR */}
         {p.receta_data && (
           <div style={{ marginTop: 14, background: C.surfaceL, borderRadius: 8, padding: 12, border: `1px solid ${C.border}` }}>
-            <div style={{ fontSize: 10, color: C.primary, fontWeight: 700, marginBottom: 8, textTransform: "uppercase" }}>📋 Receta OCR</div>
+            <div style={{ fontSize: 10, color: C.primary, fontWeight: 700, marginBottom: 8, textTransform: "uppercase", display: "inline-flex", alignItems: "center", gap: 6 }}><Icon name="file" size={12} /> Receta OCR</div>
             {[["OD", p.receta_data?.OD], ["OI", p.receta_data?.OI]].map(([eye, d]) => d && (
               <div key={eye} style={{ fontSize: 11, marginBottom: 4 }}>
                 <span style={{ color: C.primary, fontWeight: 700 }}>{eye} </span>
@@ -577,12 +578,12 @@ function PatientPanel({ p, onClose, onGoToDashboard }) {
           background: `${C.primary}15`, color: C.primary, border: `1px solid ${C.primary}35`,
           borderRadius: 8, padding: "8px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer",
           width: "100%", textAlign: "center", textDecoration: "none", display: "block", position: "relative", zIndex: 5,
-        }}>📋 Ver ficha completa</a>
+        }}><Icon name="file" size={12} /> Ver ficha completa</a>
         {p.telefono && (
           <button onClick={() => window.open(`https://wa.me/${p.telefono.replace(/\D/g, "")}`, "_blank")} style={{
             background: "rgba(37,211,102,0.1)", color: "#25D366", border: "1px solid rgba(37,211,102,0.2)",
             borderRadius: 8, padding: "8px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer",
-          }}>📱 Abrir en WhatsApp</button>
+          }}><Icon name="phone" size={12} /> Abrir en WhatsApp</button>
         )}
       </div>
     </aside>
@@ -934,7 +935,7 @@ export default function AukenOptica() {
           borderRadius: C.radiusLg, padding: "12px 18px", boxShadow: C.shadowLg,
           animation: "slideIn 0.3s ease-out", display: "flex", alignItems: "center", gap: 10,
         }}>
-          <span style={{ fontSize: 16 }}>💬</span>
+          <Icon name="chat" size={16} color={C.primary} />
           <div>
             <div style={{ fontSize: 11, color: C.primary, fontWeight: 700 }}>Nuevo mensaje</div>
             <div style={{ fontSize: 12, color: C.ink }}>{newMsgAlert}</div>
@@ -957,7 +958,7 @@ export default function AukenOptica() {
               ☰
             </button>
           )}
-          <div style={{ width: 26, height: 26, background: `linear-gradient(135deg, ${C.primary}, ${C.neon})`, borderRadius: C.radiusSm, display: "flex", alignItems: "center", justifyContent: "center", fontSize: 13, boxShadow: `0 0 10px ${C.primarySoft}` }}>👁️</div>
+          <div style={{ width: 26, height: 26, background: `linear-gradient(135deg, ${C.primary}, ${C.neon})`, borderRadius: C.radiusSm, display: "flex", alignItems: "center", justifyContent: "center", color: "#000", boxShadow: `0 0 10px ${C.primarySoft}` }}><Icon name="eye" size={14} strokeWidth={1.8} /></div>
           <span style={{ fontFamily: C.fontSans, fontWeight: 700, fontSize: 14, letterSpacing: '-0.02em' }}>Monitor</span>
           <span style={{ color: C.inkFaint }}>·</span>
           <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: C.green }}>
@@ -973,7 +974,7 @@ export default function AukenOptica() {
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
           <a href={DASHBOARD_PATH} onClick={openDashboard}
             style={{ background: `${C.primary}15`, color: C.primary, border: `1px solid ${C.primary}30`, borderRadius: 6, padding: "5px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", textDecoration: "none", position: "relative", zIndex: 5 }}>
-            📊 Dashboard
+            <Icon name="metrics" size={12} /> Dashboard
           </a>
           <button onClick={() => { localStorage.removeItem("auken_auth"); navigate("/login"); }}
             style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.inkFaint, borderRadius: 6, padding: "5px 10px", fontSize: 11, cursor: "pointer" }}>
@@ -1031,7 +1032,7 @@ export default function AukenOptica() {
               opacity: creandoDemo ? 0.6 : 1, transition: "all 0.15s",
             }}
             title="Crea un paciente placeholder para probar el flujo de registro automático de la IA">
-              {creandoDemo ? "Creando…" : "🎭 + Demo cliente nuevo"}
+              {creandoDemo ? "Creando…" : <><Icon name="plus" size={12} /> Demo cliente nuevo</>}
             </button>
           </div>
 
@@ -1095,15 +1096,15 @@ export default function AukenOptica() {
                       padding: "5px 10px", borderRadius: 7, fontSize: 11, cursor: "pointer", fontWeight: 700,
                       boxShadow: testMode ? `0 0 12px ${C.purple}40` : "none",
                     }}>
-                    🧪 {testMode ? "Modo Prueba ON" : "Probar IA"}
+                    <Icon name="bot" size={12} /> {testMode ? "Modo Prueba ON" : "Probar IA"}
                   </button>
                   <button onClick={() => setShowQuick(v => !v)}
                     style={{ background: showQuick ? `${C.amber}20` : C.surfaceL, border: `1px solid ${showQuick ? C.amber + "50" : C.border}`, color: showQuick ? C.amber : C.inkMid, padding: "5px 10px", borderRadius: 7, fontSize: 11, cursor: "pointer", fontWeight: 600 }}>
-                    ⚡ Rápidas
+                    <Icon name="bolt" size={12} /> Rápidas
                   </button>
                   <button onClick={() => setShowPanel(v => !v)}
                     style={{ background: showPanel ? `${C.primary}20` : C.surfaceL, border: `1px solid ${showPanel ? C.primary + "40" : C.border}`, color: showPanel ? C.primary : C.inkMid, padding: "5px 10px", borderRadius: 7, fontSize: 11, cursor: "pointer", fontWeight: 600 }}>
-                    👤 Ficha
+                    <Icon name="users" size={12} /> Ficha
                   </button>
                 </div>
               </div>
@@ -1115,7 +1116,7 @@ export default function AukenOptica() {
                   borderBottom: `1px solid ${C.purple}30`, display: "flex", alignItems: "center", gap: 10,
                   fontSize: 11, color: C.purple, fontWeight: 600, animation: "slideIn 0.2s ease-out",
                 }}>
-                  <span style={{ fontSize: 13 }}>🧪</span>
+                  <Icon name="bot" size={13} />
                   <span>Modo Prueba: tus mensajes se enviarán como si fueras el cliente. Claude IA responderá automáticamente.</span>
                 </div>
               )}
@@ -1138,14 +1139,14 @@ export default function AukenOptica() {
               <div style={{ flex: 1, overflowY: "auto", padding: "16px 20px", display: "flex", flexDirection: "column" }}>
                 {messages.length === 0 && (
                   <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", color: C.inkFaint, gap: 10 }}>
-                    <div style={{ fontSize: 40, opacity: 0.15 }}>💬</div>
+                    <div style={{ opacity: 0.15 }}><Icon name="chat" size={40} /></div>
                     <div style={{ fontSize: 12, opacity: 0.4 }}>Sin mensajes con este paciente</div>
                   </div>
                 )}
 
                 {iaThinking && (
                   <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", background: `${C.neon}10`, border: `1px solid ${C.neon}30`, borderRadius: 12, alignSelf: "flex-start", marginBottom: 10, animation: "fadeUp 0.2s" }}>
-                    <span style={{ fontSize: 11, color: C.neon, fontWeight: 700 }}>🤖 Aukén IA está pensando</span>
+                    <span style={{ fontSize: 11, color: C.neon, fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon name="bot" size={12} /> Aukén IA está pensando</span>
                     <span style={{ display: "flex", gap: 3 }}>
                       {[0, 1, 2].map(i => (
                         <span key={i} style={{ width: 5, height: 5, borderRadius: "50%", background: C.neon, animation: `blink 1.4s infinite ${i * 0.2}s` }} />
@@ -1212,14 +1213,14 @@ export default function AukenOptica() {
                 </div>
                 <div style={{ fontSize: 10, color: C.inkFaint, marginTop: 5, paddingLeft: 2 }}>
                   {testMode
-                    ? "🧪 Modo Prueba activo — Claude IA responderá según el system prompt configurado"
-                    : "Enter para enviar · ⚡ para respuestas predefinidas · 🧪 para probar la IA"}
+                    ? "Modo Prueba activo — Claude IA responderá según el system prompt configurado"
+                    : "Enter para enviar · respuestas predefinidas · probar la IA"}
                 </div>
               </div>
             </>
           ) : (
             <div style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 12, color: C.inkFaint }}>
-              <div style={{ fontSize: 52, opacity: 0.1 }}>💬</div>
+              <div style={{ opacity: 0.1 }}><Icon name="chat" size={52} /></div>
               <div style={{ fontSize: 12, fontWeight: 600, opacity: 0.35, letterSpacing: "0.1em", textTransform: "uppercase" }}>Selecciona un canal</div>
               {totalUnread > 0 && (
                 <div style={{ marginTop: 8, background: `${C.red}15`, border: `1px solid ${C.red}30`, borderRadius: 8, padding: "8px 16px", fontSize: 12, color: C.red, fontWeight: 600 }}>

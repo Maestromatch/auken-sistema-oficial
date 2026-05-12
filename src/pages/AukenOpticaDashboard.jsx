@@ -3,6 +3,7 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useToaster } from "../components/Toaster";
 import { useViewport } from "../lib/useViewport";
+import Icon from "../components/Icon";
 
 // =============================================================
 // AUKÉN OPTICA DASHBOARD — versión limpia
@@ -117,7 +118,7 @@ function makeSeries(end, n = 7) {
 }
 
 // KPI con delta pill + sparkline SVG — reemplaza el KPI anterior
-function KpiCard({ label, value, sub, delta, accent = C.text, series = [], glow }) {
+function KpiCard({ label, value, sub, delta, accent = C.text, series = [], glow, icon }) {
   const up = delta >= 0;
   const deltaColor = up ? C.green : C.red;
   const deltaBg    = up ? 'rgba(52,211,153,0.10)' : 'rgba(248,113,113,0.10)';
@@ -150,7 +151,8 @@ function KpiCard({ label, value, sub, delta, accent = C.text, series = [], glow 
     }}>
       {/* Header: label + delta pill */}
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', gap: 8 }}>
-        <span style={{ fontSize: 12, fontWeight: 500, color: C.textDim, letterSpacing: '-0.005em', lineHeight: 1.3 }}>
+        <span style={{ display: "inline-flex", alignItems: "center", gap: 6, fontSize: 12, fontWeight: 500, color: C.textDim, letterSpacing: '-0.005em', lineHeight: 1.3 }}>
+          {icon && <span style={{ display: "inline-flex", color: accent }}>{icon}</span>}
           {label}
         </span>
         {hasDelta && (
@@ -309,7 +311,7 @@ function DashboardTab({ active, icon, label, count, onClick }) {
         transition: `color ${C.dur} ${C.ease}, background ${C.dur} ${C.ease}`,
       }}
     >
-      <span style={{ fontSize: 14, opacity: active ? 1 : 0.7 }}>{icon}</span>
+      <span style={{ display: "inline-flex", alignItems: "center", opacity: active ? 1 : 0.7 }}>{icon}</span>
       {label}
       {typeof count === "number" && (
         <span style={{
@@ -1113,6 +1115,7 @@ function Pill({ label, color }) {
     <span style={{
       display: 'inline-flex',
       alignItems: 'center',
+      gap: 5,
       height: 22,
       padding: '0 8px',
       background: `${color}18`,
@@ -1691,15 +1694,15 @@ function TabMetricas({ optica, stats }) {
       {/* Fila 2 — actividad */}
       <div className="auken-kpi-grid auken-kpi-grid--activity">
         <KpiCard
-          label="💬 Conversaciones 24h" value={conv24} accent={C.blue}
+          icon={<Icon name="chat" size={14} />} label="Conversaciones 24h" value={conv24} accent={C.blue}
           sub="bot atendiendo en vivo" series={makeSeries(conv24)}
         />
         <KpiCard
-          label="📅 Citas próximas" value={citasPrx} accent={C.primary}
+          icon={<Icon name="calendar" size={14} />} label="Citas próximas" value={citasPrx} accent={C.primary}
           sub="hoy y siguientes" series={makeSeries(citasPrx)}
         />
         <KpiCard
-          label="💰 Ventas totales"
+          icon={<Icon name="money" size={14} />} label="Ventas totales"
           value={ventas ? `$${Number(ventas).toLocaleString("es-CL")}` : "$0"}
           accent={C.green}
           sub="CLP acumulados"
@@ -1809,11 +1812,11 @@ function TabPacientes({ optica, pacientes, refresh, handleSendWhatsApp, onEdit, 
                 <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
                   <button onClick={(e) => { e.stopPropagation(); handleSendWhatsApp(p); }}
                     style={{ flex: 1, background: "rgba(37,211,102,0.15)", border: "1px solid #25D36640", color: "#25D366", borderRadius: 6, padding: "7px", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
-                    📱 WhatsApp
+                    <Icon name="phone" size={13} /> WhatsApp
                   </button>
                   <button onClick={(e) => { e.stopPropagation(); onEdit(p); }}
                     style={{ flex: 1, background: `${C.primary}15`, color: C.primary, border: `1px solid ${C.primary}40`, padding: "7px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
-                    ✏️ Editar
+                    <Icon name="edit" size={13} /> Editar
                   </button>
                 </div>
               </div>
@@ -1878,9 +1881,9 @@ function TabPacientes({ optica, pacientes, refresh, handleSendWhatsApp, onEdit, 
               },
             ]}
             rowActions={p => [
-              { icon: "👁", label: "Ver ficha", color: C.primary, run: () => onEdit(p) },
-              { icon: "✎", label: "Editar", color: C.textDim, run: () => onEdit(p) },
-              { icon: "☎", label: "WhatsApp", color: "#25D366", run: () => handleSendWhatsApp(p) },
+            { icon: <Icon name="eye" size={14} />, label: "Ver ficha", color: C.primary, run: () => onEdit(p) },
+            { icon: <Icon name="edit" size={14} />, label: "Editar", color: C.textDim, run: () => onEdit(p) },
+            { icon: <Icon name="phone" size={14} />, label: "WhatsApp", color: "#25D366", run: () => handleSendWhatsApp(p) },
             ]}
             bulkActions={[
               { label: "Exportar CSV", run: exportSelected },
@@ -1945,10 +1948,10 @@ function TabPacientes({ optica, pacientes, refresh, handleSendWhatsApp, onEdit, 
                     <td style={{ padding: "12px 16px", display: "flex", gap: 8 }}>
                       <button onClick={(e) => { e.stopPropagation(); handleSendWhatsApp(p); }}
                         style={{ background: "rgba(37, 211, 102, 0.15)", border: "1px solid #25D36640", color: "#25D366", borderRadius: 6, padding: "6px 10px", cursor: "pointer", fontSize: 11, fontWeight: 600 }}
-                      >📱 WhatsApp</button>
+                      ><Icon name="phone" size={13} /> WhatsApp</button>
                       <button onClick={(e) => { e.stopPropagation(); onEdit(p); }}
                         style={{ background: `${C.primary}15`, color: C.primary, border: `1px solid ${C.primary}40`, padding: "6px 10px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 600 }}
-                      >✏️ Editar</button>
+                      ><Icon name="edit" size={13} /> Editar</button>
                     </td>
                   </tr>
                 );
@@ -2011,7 +2014,7 @@ function CitaModal({ opticaId, pacientes, onClose, refresh, initialDraft }) {
       onClose={onClose}
       title="Nueva Cita Manual"
       subtitle="Agenda una cita manual o completa datos desde un paciente existente."
-      icon="📅"
+      icon={<Icon name="calendar" size={16} />}
       size="md"
       footer={(
         <>
@@ -2021,7 +2024,7 @@ function CitaModal({ opticaId, pacientes, onClose, refresh, initialDraft }) {
           </button>
           <button onClick={save} disabled={saving}
             style={{ background: C.primary, color: "#000", border: "none", padding: "10px 22px", borderRadius: 8, cursor: saving ? "default" : "pointer", fontSize: 13, fontWeight: 700, opacity: saving ? 0.6 : 1 }}>
-            {saving ? "Guardando..." : "📅 Agendar Cita"}
+            {saving ? "Guardando..." : <><Icon name="calendar" size={14} /> Agendar Cita</>}
           </button>
         </>
       )}
@@ -2183,17 +2186,17 @@ function TabCitas({ citas, refresh, optica, pacientes, onCreateCita }) {
                   </div>
                   <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
                     <Pill label={c.estado} color={estadoColor} />
-                    {isBot && <Pill label="🤖 IA" color="#A78BFA" />}
+                    {isBot && <Pill label={<><Icon name="bot" size={12} /> IA</>} color="#A78BFA" />}
                     {calLink && (
                       <a href={calLink} target="_blank" rel="noopener noreferrer"
                         style={{ fontSize: 11, color: "#7DD3FC", textDecoration: "none", fontWeight: 700, background: "rgba(66,133,244,0.15)", padding: "4px 10px", borderRadius: 4, border: "1px solid rgba(66,133,244,0.4)" }}>
-                        📅 Google Calendar
+                        <Icon name="calendar" size={12} /> Google Calendar
                       </a>
                     )}
                     {c.estado === "pendiente_confirmacion" && (
                       <button onClick={() => updateCita(c.id, "confirmada")}
                         style={{ background: `${C.green}20`, color: C.green, border: `1px solid ${C.green}40`, padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>
-                        ✓ Confirmar
+                        <Icon name="check" size={12} /> Confirmar
                       </button>
                     )}
                     {c.estado !== "cancelada" && (
@@ -2262,7 +2265,7 @@ function TabCitas({ citas, refresh, optica, pacientes, onCreateCita }) {
               {
                 key: "origen",
                 label: "Origen",
-                render: c => <Pill label={c.origen === "bot-ia" ? "🤖 IA" : (c.origen || "manual")} color={c.origen === "bot-ia" ? "#A78BFA" : C.blue} />,
+                render: c => <Pill label={c.origen === "bot-ia" ? <><Icon name="bot" size={12} /> IA</> : (c.origen || "manual")} color={c.origen === "bot-ia" ? "#A78BFA" : C.blue} />,
               },
               {
                 key: "estado",
@@ -2284,7 +2287,7 @@ function TabCitas({ citas, refresh, optica, pacientes, onCreateCita }) {
                     <a href={calLink} target="_blank" rel="noopener noreferrer"
                       onClick={e => e.stopPropagation()}
                       style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 28, padding: "0 10px", borderRadius: 6, background: "rgba(66,133,244,0.15)", color: "#7DD3FC", border: "1px solid rgba(66,133,244,0.4)", fontSize: 11, fontWeight: 700, textDecoration: "none" }}>
-                      📅 Google
+                      <Icon name="calendar" size={12} /> Google
                     </a>
                   );
                 },
@@ -2293,9 +2296,9 @@ function TabCitas({ citas, refresh, optica, pacientes, onCreateCita }) {
             rowActions={c => {
               const calLink = c.fecha ? buildCalLinkForCita(c, optica) : null;
               return [
-                ...(calLink ? [{ icon: "📅", label: "Agregar a Google Calendar", color: "#7DD3FC", run: () => window.open(calLink, "_blank", "noopener,noreferrer") }] : []),
-                ...(c.estado === "pendiente_confirmacion" ? [{ icon: "✓", label: "Confirmar", color: C.green, run: () => updateCita(c.id, "confirmada") }] : []),
-                ...(c.estado !== "cancelada" ? [{ icon: "×", label: "Cancelar", color: C.red, run: () => updateCita(c.id, "cancelada") }] : []),
+                ...(calLink ? [{ icon: <Icon name="calendar" size={14} />, label: "Agregar a Google Calendar", color: "#7DD3FC", run: () => window.open(calLink, "_blank", "noopener,noreferrer") }] : []),
+                ...(c.estado === "pendiente_confirmacion" ? [{ icon: <Icon name="check" size={14} />, label: "Confirmar", color: C.green, run: () => updateCita(c.id, "confirmada") }] : []),
+                ...(c.estado !== "cancelada" ? [{ icon: <Icon name="x" size={14} />, label: "Cancelar", color: C.red, run: () => updateCita(c.id, "cancelada") }] : []),
               ];
             }}
             bulkActions={[
@@ -2331,7 +2334,7 @@ function TabCitas({ citas, refresh, optica, pacientes, onCreateCita }) {
                     : c.estado === "completada" ? C.blue : C.amber;
                   const isBot = c.origen === "bot-ia";
                   const origenColor = isBot ? "#A78BFA" : C.blue;
-                  const origenLabel = isBot ? "🤖 IA" : (c.origen || "manual");
+                  const origenLabel = isBot ? "IA" : (c.origen || "manual");
                   const calLink = c.fecha ? buildCalLinkForCita(c, optica) : null;
 
                   return (
@@ -2353,7 +2356,7 @@ function TabCitas({ citas, refresh, optica, pacientes, onCreateCita }) {
                             <a href={calLink} target="_blank" rel="noopener noreferrer"
                               title="Agregar a Google Calendar"
                               style={{ background: "rgba(66,133,244,0.15)", color: "#7DD3FC", border: "1px solid rgba(66,133,244,0.4)", padding: "5px 10px", borderRadius: 4, fontSize: 11, fontWeight: 700, textDecoration: "none" }}>
-                              📅 Calendar
+                              <Icon name="calendar" size={12} /> Calendar
                             </a>
                           )}
                           {c.estado === "pendiente_confirmacion" && (
@@ -2488,7 +2491,7 @@ function TabConfiguracion({ optica, refresh }) {
           borderRadius: 10, padding: "12px 16px", marginBottom: 20,
           fontSize: 12, color: C.amber, lineHeight: 1.6,
         }}>
-          <div style={{ fontWeight: 700, marginBottom: 4 }}>⚠️ Migración 007 requerida para guardar Servicios</div>
+          <div style={{ fontWeight: 700, marginBottom: 4, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon name="warning" size={14} /> Migración 007 requerida para guardar Servicios</div>
           <div style={{ color: C.textDim }}>
             Los cambios de nombre/horario/teléfono ya se guardan correctamente.
             Para que los <strong style={{ color: C.amber }}>servicios y precios</strong> persistan en la BD, ejecuta la migración en:
@@ -2500,7 +2503,7 @@ function TabConfiguracion({ optica, refresh }) {
 
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 6 }}>
-          <h3 style={{ fontSize: 18, fontWeight: 700, color: C.text }}>⚙️ Configuración de la Óptica</h3>
+          <h3 style={{ fontSize: 18, fontWeight: 700, color: C.text, display: "inline-flex", alignItems: "center", gap: 8 }}><Icon name="settings" size={18} /> Configuración de la Óptica</h3>
           <SaveStatus state={autosave.state} savedAt={autosave.savedAt} error={autosave.error} onRetry={retrySave} />
         </div>
         <p style={{ fontSize: 13, color: C.textDim }}>Estos datos los usa el bot Aukén automáticamente en cada conversación.</p>
@@ -2570,7 +2573,7 @@ function TabConfiguracion({ optica, refresh }) {
         {/* ERROR */}
         {autosave.state === "error" && (
           <div style={{ background: `${C.red}15`, border: `1px solid ${C.red}40`, borderRadius: 8, padding: "10px 14px", fontSize: 12, color: C.red }}>
-            ⚠️ Error al guardar: {autosave.error}
+            <Icon name="warning" size={13} /> Error al guardar: {autosave.error}
             <br /><span style={{ color: C.textDim, fontSize: 11 }}>
               Si el error menciona una columna, ejecuta la migración 007 en Supabase SQL Editor.
             </span>
@@ -2683,7 +2686,7 @@ function PatientModal({ patient, opticaId, onClose, refresh }) {
             {!isNew && (
               <button onClick={remove}
                 style={{ background: "transparent", color: C.red, border: `1px solid ${C.red}40`, padding: "10px 16px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>
-                🗑 Eliminar
+                <Icon name="trash" size={13} /> Eliminar
               </button>
             )}
           </div>
@@ -2710,7 +2713,7 @@ function PatientModal({ patient, opticaId, onClose, refresh }) {
             padding: 14, borderRadius: 8, cursor: scanning ? "default" : "pointer",
             fontSize: 13, fontWeight: 600,
           }}>
-            {scanning ? "🔍 Analizando receta con IA..." : "📸 Escanear receta con cámara/foto"}
+            {scanning ? <><Icon name="search" size={13} /> Analizando receta con IA...</> : <><Icon name="camera" size={13} /> Escanear receta con cámara/foto</>}
             <input type="file" accept="image/*" style={{ display: "none" }} onChange={scanReceta} disabled={scanning} />
           </label>
 
@@ -2761,7 +2764,7 @@ function PatientModal({ patient, opticaId, onClose, refresh }) {
           {/* Receta */}
           {edit.receta_data && (
             <div style={{ background: `${C.border}30`, border: `1px solid ${C.border}`, borderRadius: 8, padding: 12 }}>
-              <div style={{ fontSize: 11, color: C.primary, textTransform: "uppercase", fontWeight: 700, marginBottom: 8 }}>📋 Receta detectada</div>
+              <div style={{ fontSize: 11, color: C.primary, textTransform: "uppercase", fontWeight: 700, marginBottom: 8, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon name="file" size={13} /> Receta detectada</div>
               <div style={{ display: "grid", gridTemplateColumns: "40px 1fr 1fr 1fr", gap: 6, fontSize: 11 }}>
                 <div></div>
                 <div style={{ color: C.textDim, textAlign: "center" }}>Esfera</div>
@@ -2884,9 +2887,9 @@ function TabEnVivo({ citas, optica }) {
               display: "inline-block", animation: loadError ? "none" : "pulse 2s infinite",
             }} />
             <style>{`@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:.4} }`}</style>
-            <span style={{ fontWeight: 700, fontSize: 14, color: C.text }}>💬 Chat en vivo</span>
+            <span style={{ fontWeight: 700, fontSize: 14, color: C.text, display: "inline-flex", alignItems: "center", gap: 8 }}><Icon name="chat" size={14} /> Chat en vivo</span>
             <span style={{ fontSize: 11, color: C.textMuted }}>
-              {loadError ? "⚠️ error" : `${mensajes.length} msgs`}
+              {loadError ? "error" : `${mensajes.length} msgs`}
             </span>
           </div>
           <div style={{ display: "flex", gap: 6 }}>
@@ -2910,7 +2913,7 @@ function TabEnVivo({ citas, optica }) {
             background: `${C.red}15`, borderBottom: `1px solid ${C.red}30`,
             padding: "8px 14px", fontSize: 11, color: C.red, lineHeight: 1.5,
           }}>
-            ⚠️ <strong>Error:</strong> {loadError}
+            <Icon name="warning" size={13} /> <strong>Error:</strong> {loadError}
             <br />
             <span style={{ color: C.textDim }}>Ejecuta la migración 008 en Supabase SQL Editor para activar realtime en mensajes_chat.</span>
           </div>
@@ -2979,7 +2982,7 @@ function TabEnVivo({ citas, optica }) {
               background: C.blue, boxShadow: `0 0 6px ${C.blue}`,
               display: "inline-block",
             }} />
-            <span style={{ fontWeight: 700, fontSize: 14, color: C.text }}>📅 Citas próximas</span>
+            <span style={{ fontWeight: 700, fontSize: 14, color: C.text, display: "inline-flex", alignItems: "center", gap: 8 }}><Icon name="calendar" size={14} /> Citas próximas</span>
           </div>
           <span style={{ fontSize: 11, color: C.textDim, fontWeight: 600 }}>
             {citasProximas.filter(c => c.fecha === today).length} hoy · {citasProximas.length} total
@@ -3036,7 +3039,7 @@ function TabEnVivo({ citas, optica }) {
                 </div>
                 <div style={{ display: "flex", gap: 6, marginTop: 8, alignItems: "center", flexWrap: "wrap" }}>
                   <Pill label={c.estado} color={estadoColor} />
-                  {isBot && <Pill label="🤖 IA" color="#A78BFA" />}
+                  {isBot && <Pill label={<><Icon name="bot" size={12} /> IA</>} color="#A78BFA" />}
                   {calLink && (
                     <a
                       href={calLink}
@@ -3052,7 +3055,7 @@ function TabEnVivo({ citas, optica }) {
                         whiteSpace: "nowrap",
                       }}
                     >
-                      📅 Google Calendar
+                      <Icon name="calendar" size={12} /> Google Calendar
                     </a>
                   )}
                 </div>
@@ -3140,7 +3143,7 @@ export default function AukenOpticaDashboard() {
         if (initialLoadDone.current) {
           const isBot = p.new.origen === "bot-ia";
           const fechaFmt = `${p.new.fecha || ""}${p.new.hora ? " · " + p.new.hora : ""}`;
-          toast.cita(isBot ? "🤖 IA agendó una cita" : "Nueva cita agendada", {
+          toast.cita(isBot ? "IA agendó una cita" : "Nueva cita agendada", {
             sub: `${p.new.nombre || "Paciente"} — ${p.new.servicio || "servicio"} — ${fechaFmt}`,
             duration: 8000,
           });
@@ -3193,12 +3196,12 @@ export default function AukenOpticaDashboard() {
       {
         label: "Navegar",
         items: [
-          { id: "metrics", icon: "📊", label: "Ir a Métricas", shortcut: "G M", run: () => setTab("metricas") },
-          { id: "live", icon: "💬", label: "En Vivo", shortcut: "G V", run: () => setTab("enlive") },
-          { id: "patients", icon: "👥", label: "Pacientes", subtitle: `${pacientes.length}`, shortcut: "G P", run: () => setTab("pacientes") },
-          { id: "citas", icon: "📅", label: "Citas", subtitle: pendingCitas ? `${pendingCitas} pendientes` : `${citas.length}`, shortcut: "G C", run: () => setTab("citas") },
-          { id: "config", icon: "⚙️", label: "Configuración", shortcut: "G S", run: () => setTab("config") },
-          { id: "monitor", icon: "💬", label: "Abrir monitor de chat", shortcut: "G O", run: () => navigate("/optica") },
+          { id: "metrics", icon: <Icon name="metrics" size={13} />, label: "Ir a Métricas", shortcut: "G M", run: () => setTab("metricas") },
+          { id: "live", icon: <Icon name="chat" size={13} />, label: "En Vivo", shortcut: "G V", run: () => setTab("enlive") },
+          { id: "patients", icon: <Icon name="users" size={13} />, label: "Pacientes", subtitle: `${pacientes.length}`, shortcut: "G P", run: () => setTab("pacientes") },
+          { id: "citas", icon: <Icon name="calendar" size={13} />, label: "Citas", subtitle: pendingCitas ? `${pendingCitas} pendientes` : `${citas.length}`, shortcut: "G C", run: () => setTab("citas") },
+          { id: "config", icon: <Icon name="settings" size={13} />, label: "Configuración", shortcut: "G S", run: () => setTab("config") },
+          { id: "monitor", icon: <Icon name="chat" size={13} />, label: "Abrir monitor de chat", shortcut: "G O", run: () => navigate("/optica") },
         ],
       },
       {
@@ -3206,7 +3209,7 @@ export default function AukenOpticaDashboard() {
         items: [
           { id: "new-patient", icon: "+", label: "Nuevo paciente", shortcut: "N P", run: openNewPatient },
           { id: "new-cita", icon: "+", label: "Nueva cita", shortcut: "N C", run: () => openCitaModal() },
-          { id: "scan-receta", icon: "◉", label: "Escanear receta", subtitle: "abre ficha paciente", shortcut: "O R", run: openNewPatient },
+          { id: "scan-receta", icon: <Icon name="camera" size={13} />, label: "Escanear receta", subtitle: "abre ficha paciente", shortcut: "O R", run: openNewPatient },
         ],
       },
       {
@@ -3263,7 +3266,7 @@ export default function AukenOpticaDashboard() {
     return (
       <div style={{ background: C.bg, minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: 24, fontFamily: "'Inter', sans-serif" }}>
         <Card style={{ maxWidth: 500 }} accent={C.red}>
-          <h3 style={{ color: C.red, fontSize: 18, marginBottom: 12 }}>⚠️ Error al cargar el dashboard</h3>
+          <h3 style={{ color: C.red, fontSize: 18, marginBottom: 12, display: "inline-flex", alignItems: "center", gap: 8 }}><Icon name="warning" size={18} /> Error al cargar el dashboard</h3>
           <p style={{ color: C.text, fontSize: 14, marginBottom: 16, lineHeight: 1.6 }}>{error}</p>
           <p style={{ color: C.textDim, fontSize: 13, lineHeight: 1.6, marginBottom: 16 }}>
             Causa más probable: la migración SQL no se ejecutó. Revisa que en Supabase existan las tablas <code style={{ color: C.primary }}>opticas</code>, <code style={{ color: C.primary }}>citas</code>, <code style={{ color: C.primary }}>conversaciones</code> y <code style={{ color: C.primary }}>message_queue</code>.
@@ -3292,7 +3295,7 @@ export default function AukenOpticaDashboard() {
         boxShadow: C.shadowSm,
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
-          <div style={{ width: isMobile ? 28 : 32, height: isMobile ? 28 : 32, background: `linear-gradient(135deg, ${C.primary}, ${C.blue})`, borderRadius: C.radius, display: "flex", alignItems: "center", justifyContent: "center", fontSize: isMobile ? 14 : 16, flexShrink: 0, boxShadow: `0 0 12px ${C.primarySoft}` }}>👁️</div>
+          <div style={{ width: isMobile ? 28 : 32, height: isMobile ? 28 : 32, background: `linear-gradient(135deg, ${C.primary}, ${C.blue})`, borderRadius: C.radius, display: "flex", alignItems: "center", justifyContent: "center", color: C.bg, flexShrink: 0, boxShadow: `0 0 12px ${C.primarySoft}` }}><Icon name="eye" size={isMobile ? 14 : 16} strokeWidth={1.8} /></div>
           <span style={{ fontFamily: C.fontSans, fontWeight: 700, fontSize: isMobile ? 14 : 17, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", letterSpacing: '-0.02em' }}>{optica?.nombre || "AUKÉN"}</span>
           {!isMobile && (
             <>
@@ -3310,7 +3313,7 @@ export default function AukenOpticaDashboard() {
           <button className="auken-touch" onClick={() => navigate("/optica")}
             title="Ir al monitor de conversaciones"
             style={{ background: C.primarySoft, border: `1px solid ${C.primaryRing}`, color: C.primary, borderRadius: C.radius, padding: isMobile ? "5px 10px" : "5px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", letterSpacing: '-0.01em', transition: `background ${C.dur} ${C.ease}` }}>
-            💬 {isMobile ? "" : "Chat"}
+            <Icon name="chat" size={13} /> {isMobile ? "" : "Chat"}
           </button>
           {!isMobile && (
             <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 12, color: C.green, fontWeight: 500, background: C.greenSoft, padding: "4px 10px", borderRadius: C.radiusSm, border: `1px solid rgba(52,211,153,0.2)` }}>
@@ -3328,11 +3331,11 @@ export default function AukenOpticaDashboard() {
       {/* TABS */}
       <div className="auken-shell">
         <div className="auken-tabs">
-          <DashboardTab active={tab === "metricas"} icon="📊" label="Métricas" onClick={() => setTab("metricas")} />
-          <DashboardTab active={tab === "enlive"} icon="🔴" label="En Vivo" onClick={() => setTab("enlive")} />
-          <DashboardTab active={tab === "pacientes"} icon="👥" label="Pacientes" count={pacientes.length} onClick={() => setTab("pacientes")} />
-          <DashboardTab active={tab === "citas"} icon="📅" label="Citas" count={citas.filter(c => c.estado === "pendiente_confirmacion").length} onClick={() => setTab("citas")} />
-          <DashboardTab active={tab === "config"} icon="⚙️" label="Configuración" onClick={() => setTab("config")} />
+          <DashboardTab active={tab === "metricas"} icon={<Icon name="metrics" size={14} />} label="Métricas" onClick={() => setTab("metricas")} />
+          <DashboardTab active={tab === "enlive"} icon={<Icon name="chat" size={14} />} label="En Vivo" onClick={() => setTab("enlive")} />
+          <DashboardTab active={tab === "pacientes"} icon={<Icon name="users" size={14} />} label="Pacientes" count={pacientes.length} onClick={() => setTab("pacientes")} />
+          <DashboardTab active={tab === "citas"} icon={<Icon name="calendar" size={14} />} label="Citas" count={citas.filter(c => c.estado === "pendiente_confirmacion").length} onClick={() => setTab("citas")} />
+          <DashboardTab active={tab === "config"} icon={<Icon name="settings" size={14} />} label="Configuración" onClick={() => setTab("config")} />
         </div>
 
         {tab === "metricas" && <TabMetricas optica={optica} stats={stats} />}
