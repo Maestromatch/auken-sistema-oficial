@@ -1283,6 +1283,174 @@ function DataTable({ rows, columns, onRowClick, rowActions, bulkActions, getRowI
   );
 }
 
+function formatDateInput(date) {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, "0");
+  const d = String(date.getDate()).padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
+function formatHourInput(hour, minute = 0) {
+  return `${String(hour).padStart(2, "0")}:${String(minute).padStart(2, "0")}`;
+}
+
+function dateFromISO(dateISO) {
+  if (!dateISO) return new Date();
+  const [y, m, d] = String(dateISO).split("-").map(Number);
+  return new Date(y, (m || 1) - 1, d || 1);
+}
+
+function WeekAgenda({ date, citas, onCitaClick, onSlotClick }) {
+  const base = new Date(date);
+  const monday = new Date(base);
+  const day = monday.getDay();
+  const diff = day === 0 ? -6 : 1 - day;
+  monday.setDate(monday.getDate() + diff);
+
+  const days = Array.from({ length: 7 }, (_, i) => {
+    const d = new Date(monday);
+    d.setDate(monday.getDate() + i);
+    return d;
+  });
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(7, minmax(120px, 1fr))", gap: 8 }}>
+      {days.map(d => {
+        const dateKey = formatDateInput(d);
+        const dayCitas = citas.filter(c => c.fecha === dateKey);
+        const isToday = dateKey === formatDateInput(new Date());
+        return (
+          <div key={dateKey} style={{ background: C.surface, border: `1px solid ${isToday ? C.primaryRing : C.border}`, borderRadius: 10, overflow: "hidden", minHeight: 180 }}>
+            <button onClick={() => onSlotClick?.({ fecha: dateKey, hora: "10:00" })}
+              style={{ width: "100%", textAlign: "left", background: isToday ? C.primarySoft : C.surfaceL, border: "none", borderBottom: `1px solid ${C.border}`, padding: "10px 12px", cursor: "pointer" }}>
+              <div style={{ fontSize: 11, color: isToday ? C.primary : C.textDim, fontWeight: 700, textTransform: "uppercase" }}>
+                {d.toLocaleDateString("es-CL", { weekday: "short" })}
+              </div>
+              <div style={{ fontSize: 18, color: C.text, fontWeight: 700 }}>{d.getDate()}</div>
+            </button>
+            <div style={{ padding: 8, display: "flex", flexDirection: "column", gap: 6 }}>
+              {dayCitas.length === 0 && <div style={{ fontSize: 11, color: C.textMuted, padding: "8px 2px" }}>Sin citas</div>}
+              {dayCitas.map(c => {
+                const estadoColor = c.estado === "confirmada" ? C.green : c.estado === "cancelada" ? C.red : c.estado === "completada" ? C.blue : C.amber;
+                return (
+                  <button key={c.id} onClick={() => onCitaClick?.(c)}
+                    style={{ textAlign: "left", background: `${estadoColor}12`, border: `1px solid ${estadoColor}30`, borderLeft: `3px solid ${estadoColor}`, borderRadius: 7, padding: "7px 8px", cursor: "pointer" }}>
+                    <div style={{ fontSize: 11, color: estadoColor, fontFamily: C.fontMono, fontWeight: 700 }}>{c.hora || "--:--"}</div>
+                    <div style={{ fontSize: 12, color: C.text, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.nombre || "Paciente"}</div>
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function DayTimeline({ date, citas, onSlotClick, onCitaClick }) {
+  const startHour = 8;
+  const endHour = 20;
+  const slotMin = 30;
+  const slots = (endHour - startHour) * (60 / slotMin);
+  const ROW_PX = 36;
+  const now = new Date();
+  const isToday = date.toDateString() === now.toDateString();
+  const nowOffset = isToday ? ((now.getHours() - startHour) * 60 + now.getMinutes()) * (ROW_PX / slotMin) : null;
+  const dateKey = formatDateInput(date);
+  const dayCitas = citas.filter(c => c.fecha === dateKey);
+
+  const statusColors = {
+    confirmada: { bg: "rgba(52,211,153,0.10)", border: "rgba(52,211,153,0.30)", text: C.green },
+    pendiente_confirmacion: { bg: "rgba(251,191,36,0.10)", border: "rgba(251,191,36,0.30)", text: C.amber },
+    completada: { bg: "rgba(125,211,252,0.08)", border: "rgba(125,211,252,0.25)", text: C.blue },
+    cancelada: { bg: C.surfaceL, border: C.border, text: C.textDim },
+  };
+
+  return (
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "14px 18px", borderBottom: `1px solid ${C.border}`, gap: 12, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 10 }}>
+          <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: C.text }}>
+            {date.toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" })}
+          </h2>
+          <span style={{ fontSize: 12, color: C.textDim, fontFamily: C.fontMono }}>{dayCitas.length} {dayCitas.length === 1 ? "cita" : "citas"}</span>
+        </div>
+        <span style={{ fontSize: 11, color: C.textMuted }}>Click en un espacio para crear una cita</span>
+      </div>
+
+      <div style={{ display: "flex", position: "relative" }}>
+        <div style={{ width: 56, flexShrink: 0, borderRight: `1px solid ${C.border}` }}>
+          {Array.from({ length: slots + 1 }).map((_, i) => {
+            const totalMin = i * slotMin;
+            const h = startHour + Math.floor(totalMin / 60);
+            const m = totalMin % 60;
+            const isFullHour = m === 0;
+            return (
+              <div key={i} style={{ height: ROW_PX, paddingRight: 8, fontSize: 10, color: isFullHour ? C.textDim : C.textMuted, fontFamily: C.fontMono, textAlign: "right", lineHeight: 1, marginTop: -5, fontWeight: isFullHour ? 600 : 400, fontVariantNumeric: "tabular-nums" }}>
+                {isFullHour ? `${String(h).padStart(2, "0")}:00` : ""}
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{ flex: 1, position: "relative", minHeight: slots * ROW_PX }}>
+          {Array.from({ length: slots }).map((_, i) => {
+            const totalMin = i * slotMin;
+            const h = startHour + Math.floor(totalMin / 60);
+            const m = totalMin % 60;
+            return (
+              <div key={i}
+                onClick={() => onSlotClick?.({ fecha: dateKey, hora: formatHourInput(h, m) })}
+                style={{ position: "absolute", left: 0, right: 0, top: i * ROW_PX, height: ROW_PX, borderTop: i % 2 === 0 ? `1px solid ${C.border}` : `1px dashed ${C.border}55`, cursor: "pointer", transition: `background ${C.dur} ${C.ease}` }}
+                onMouseEnter={e => e.currentTarget.style.background = "rgba(249,115,22,0.04)"}
+                onMouseLeave={e => e.currentTarget.style.background = "transparent"}
+              />
+            );
+          })}
+
+          {nowOffset !== null && nowOffset > 0 && nowOffset < slots * ROW_PX && (
+            <div style={{ position: "absolute", left: -4, right: 0, top: nowOffset, height: 2, background: C.red, boxShadow: "0 0 8px rgba(248,113,113,0.5)", zIndex: 3, pointerEvents: "none" }}>
+              <span style={{ position: "absolute", left: -8, top: -5, width: 12, height: 12, borderRadius: "50%", background: C.red, animation: "auken-now-pulse 2s ease-in-out infinite" }} />
+            </div>
+          )}
+
+          {dayCitas.map(c => {
+            const [hh = "12", mm = "00"] = String(c.hora || "12:00").split(":");
+            const hour = Number(hh);
+            const min = Number(mm);
+            const top = ((hour - startHour) * 60 + min) * (ROW_PX / slotMin);
+            const durationMin = Number(c.durationMin || c.duracion_min || 30);
+            const height = Math.max(28, durationMin * (ROW_PX / slotMin) - 4);
+            const color = statusColors[c.estado] || statusColors.pendiente_confirmacion;
+            if (top < 0 || top > slots * ROW_PX) return null;
+            return (
+              <button key={c.id} onClick={() => onCitaClick?.(c)}
+                style={{ position: "absolute", top, left: 8, right: 8, height, background: color.bg, border: `1px solid ${color.border}`, borderLeft: `3px solid ${color.text}`, borderRadius: 6, padding: "6px 10px", textAlign: "left", cursor: "pointer", display: "flex", flexDirection: "column", gap: 2, overflow: "hidden", transition: `transform ${C.dur} ${C.ease}, box-shadow ${C.dur}`, zIndex: 2 }}
+                onMouseEnter={e => { e.currentTarget.style.transform = "translateX(2px)"; e.currentTarget.style.boxShadow = "0 4px 16px rgba(0,0,0,0.4)"; }}
+                onMouseLeave={e => { e.currentTarget.style.transform = "translateX(0)"; e.currentTarget.style.boxShadow = "none"; }}
+              >
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 6 }}>
+                  <span style={{ fontSize: 12, fontWeight: 700, color: C.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.nombre || "Paciente"}</span>
+                  <span style={{ fontSize: 10, color: color.text, fontFamily: C.fontMono, fontWeight: 700, flexShrink: 0 }}>{c.hora || "--:--"}</span>
+                </div>
+                {height > 32 && <span style={{ fontSize: 11, color: C.textDim, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.servicio || "Cita"} · {durationMin}min</span>}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <style>{`
+        @keyframes auken-now-pulse {
+          0%, 100% { transform: scale(1); opacity: 1; }
+          50% { transform: scale(1.35); opacity: 0.65; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 function BotHealthBar({ status = "healthy", stats = [], onWake }) {
   const statusMap = {
     healthy: { color: C.green, label: "Operando en vivo", pulse: true },
@@ -1797,11 +1965,11 @@ function TabPacientes({ optica, pacientes, refresh, handleSendWhatsApp, onEdit, 
 // ─────────────────────────────────────────────────────────────
 // MODAL: NUEVA CITA MANUAL
 // ─────────────────────────────────────────────────────────────
-function CitaModal({ opticaId, pacientes, onClose, refresh }) {
+function CitaModal({ opticaId, pacientes, onClose, refresh, initialDraft }) {
   const today = new Date().toISOString().split("T")[0];
   const [form, setForm] = useState({
     nombre: "", telefono: "", servicio: "",
-    fecha: today, hora: "10:00", notas: "",
+    fecha: initialDraft?.fecha || today, hora: initialDraft?.hora || "10:00", notas: "",
     estado: "confirmada",
   });
   const [saving, setSaving] = useState(false);
@@ -1919,6 +2087,8 @@ function CitaModal({ opticaId, pacientes, onClose, refresh }) {
 // ─────────────────────────────────────────────────────────────
 function TabCitas({ citas, refresh, optica, pacientes, onCreateCita }) {
   const { isMobile } = useViewport();
+  const [view, setView] = useState("dia");
+  const [selectedDate, setSelectedDate] = useState(() => dateFromISO(new Date().toISOString().split("T")[0]));
 
   const updateCita = async (id, estado) => {
     await supabase.from("citas").update({ estado }).eq("id", id);
@@ -1926,6 +2096,12 @@ function TabCitas({ citas, refresh, optica, pacientes, onCreateCita }) {
   };
 
   const pendientes = citas.filter(c => c.estado === "pendiente_confirmacion").length;
+  const selectedDateISO = formatDateInput(selectedDate);
+  const shiftDate = (days) => setSelectedDate(prev => {
+    const next = new Date(prev);
+    next.setDate(next.getDate() + days);
+    return next;
+  });
 
   return (
     <>
@@ -1942,12 +2118,32 @@ function TabCitas({ citas, refresh, optica, pacientes, onCreateCita }) {
                 : `${citas.length} citas totales`}
             </div>
           </div>
-          <button
-            onClick={onCreateCita}
-            style={{ background: C.primary, color: "#000", border: "none", borderRadius: 6, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
-          >
-            + Nueva Cita
-          </button>
+          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            {!isMobile && (
+              <>
+                <div style={{ display: "flex", gap: 4, padding: 3, background: C.bg, borderRadius: 8, border: `1px solid ${C.border}` }}>
+                  {[["dia", "Día"], ["semana", "Semana"], ["lista", "Lista"]].map(([key, label]) => (
+                    <button key={key} onClick={() => setView(key)}
+                      style={{ height: 26, padding: "0 10px", borderRadius: 5, background: view === key ? C.surfaceL : "transparent", color: view === key ? C.text : C.textDim, border: "none", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                      {label}
+                    </button>
+                  ))}
+                </div>
+                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                  <button onClick={() => shiftDate(-1)} style={{ width: 28, height: 28, borderRadius: 6, background: C.bg, border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer" }}>‹</button>
+                  <input type="date" value={selectedDateISO} onChange={e => setSelectedDate(dateFromISO(e.target.value))}
+                    style={{ height: 28, background: C.bg, border: `1px solid ${C.border}`, color: C.text, borderRadius: 6, padding: "0 8px", fontSize: 12 }} />
+                  <button onClick={() => shiftDate(1)} style={{ width: 28, height: 28, borderRadius: 6, background: C.bg, border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer" }}>›</button>
+                </div>
+              </>
+            )}
+            <button
+              onClick={() => onCreateCita({ fecha: selectedDateISO, hora: "10:00" })}
+              style={{ background: C.primary, color: "#000", border: "none", borderRadius: 6, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
+            >
+              + Nueva Cita
+            </button>
+          </div>
         </div>
 
         {/* MOBILE: tarjetas */}
@@ -1958,7 +2154,7 @@ function TabCitas({ citas, refresh, optica, pacientes, onCreateCita }) {
                 title="Agenda limpia"
                 body="El bot agenda automáticamente cuando conversa con un paciente. También puedes crear una cita manualmente."
                 cta="+ Nueva Cita"
-                onCta={onCreateCita}
+                onCta={() => onCreateCita({ fecha: selectedDateISO, hora: "10:00" })}
                 accent={C.blue}
               />
             )}
@@ -2014,6 +2210,29 @@ function TabCitas({ citas, refresh, optica, pacientes, onCreateCita }) {
       ) : (
         /* DESKTOP: tabla completa */
           <>
+          {view === "dia" && (
+            <DayTimeline
+              date={selectedDate}
+              citas={citas}
+              onSlotClick={onCreateCita}
+              onCitaClick={(c) => {
+                const calLink = c.fecha ? buildCalLinkForCita(c, optica) : null;
+                if (calLink) window.open(calLink, "_blank", "noopener,noreferrer");
+              }}
+            />
+          )}
+          {view === "semana" && (
+            <WeekAgenda
+              date={selectedDate}
+              citas={citas}
+              onSlotClick={onCreateCita}
+              onCitaClick={(c) => {
+                const calLink = c.fecha ? buildCalLinkForCita(c, optica) : null;
+                if (calLink) window.open(calLink, "_blank", "noopener,noreferrer");
+              }}
+            />
+          )}
+          {view === "lista" && (
           <DataTable
             rows={citas}
             empty={
@@ -2021,7 +2240,7 @@ function TabCitas({ citas, refresh, optica, pacientes, onCreateCita }) {
                 title="Agenda limpia"
                 body="El bot agenda automÃ¡ticamente. TambiÃ©n puedes crear una cita manualmente con el botÃ³n superior."
                 cta="+ Nueva Cita"
-                onCta={onCreateCita}
+                onCta={() => onCreateCita({ fecha: selectedDateISO, hora: "10:00" })}
                 accent={C.blue}
               />
             }
@@ -2084,6 +2303,7 @@ function TabCitas({ citas, refresh, optica, pacientes, onCreateCita }) {
               { label: "Cancelar", run: ids => ids.forEach(id => updateCita(id, "cancelada")) },
             ]}
           />
+          )}
           <div style={{ display: "none", overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
@@ -2100,7 +2320,7 @@ function TabCitas({ citas, refresh, optica, pacientes, onCreateCita }) {
                       title="Agenda limpia"
                       body="El bot agenda automáticamente. También puedes crear una cita manualmente con el botón superior."
                       cta="+ Nueva Cita"
-                      onCta={onCreateCita}
+                      onCta={() => onCreateCita({ fecha: selectedDateISO, hora: "10:00" })}
                       accent={C.blue}
                     />
                   </td></tr>
@@ -2863,6 +3083,7 @@ export default function AukenOpticaDashboard() {
   const [editingPatient, setEditingPatient] = useState(null);
   const [showPatientModal, setShowPatientModal] = useState(false);
   const [showCitaModal, setShowCitaModal] = useState(false);
+  const [citaDraft, setCitaDraft] = useState(null);
   const [commandOpen, setCommandOpen] = useState(false);
 
   // Slug de la óptica (en F3 vendrá del usuario logueado)
@@ -2960,6 +3181,11 @@ export default function AukenOpticaDashboard() {
     setTab("pacientes");
   }, []);
 
+  const openCitaModal = useCallback((draft = null) => {
+    setCitaDraft(draft);
+    setShowCitaModal(true);
+  }, []);
+
   const commands = useMemo(() => {
     const pendingCitas = citas.filter(c => c.estado === "pendiente_confirmacion").length;
 
@@ -2979,7 +3205,7 @@ export default function AukenOpticaDashboard() {
         label: "Acciones rápidas",
         items: [
           { id: "new-patient", icon: "+", label: "Nuevo paciente", shortcut: "N P", run: openNewPatient },
-          { id: "new-cita", icon: "+", label: "Nueva cita", shortcut: "N C", run: () => setShowCitaModal(true) },
+          { id: "new-cita", icon: "+", label: "Nueva cita", shortcut: "N C", run: () => openCitaModal() },
           { id: "scan-receta", icon: "◉", label: "Escanear receta", subtitle: "abre ficha paciente", shortcut: "O R", run: openNewPatient },
         ],
       },
@@ -2995,7 +3221,7 @@ export default function AukenOpticaDashboard() {
         })),
       },
     ];
-  }, [citas, navigate, openEditPatient, openNewPatient, pacientes]);
+  }, [citas, navigate, openCitaModal, openEditPatient, openNewPatient, pacientes]);
 
   // Acción WhatsApp — normaliza número chileno y abre wa.me
   // NO es async porque window.open necesita estar en el contexto directo del evento
@@ -3119,7 +3345,7 @@ export default function AukenOpticaDashboard() {
             onCreate={() => { setEditingPatient(null); setShowPatientModal(true); }}
           />
         )}
-        {tab === "citas" && <TabCitas citas={citas} refresh={refresh} optica={optica} pacientes={pacientes} onCreateCita={() => setShowCitaModal(true)} />}
+        {tab === "citas" && <TabCitas citas={citas} refresh={refresh} optica={optica} pacientes={pacientes} onCreateCita={openCitaModal} />}
         {tab === "config" && <TabConfiguracion optica={optica} refresh={refresh} />}
       </div>
 
@@ -3129,7 +3355,8 @@ export default function AukenOpticaDashboard() {
         <CitaModal
           opticaId={optica?.id}
           pacientes={pacientes || []}
-          onClose={() => setShowCitaModal(false)}
+          initialDraft={citaDraft}
+          onClose={() => { setShowCitaModal(false); setCitaDraft(null); }}
           refresh={refresh}
         />
       )}
