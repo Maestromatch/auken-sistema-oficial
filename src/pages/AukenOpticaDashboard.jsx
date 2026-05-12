@@ -487,6 +487,145 @@ function Modal({ open = true, onClose, title, subtitle, children, footer, size =
   );
 }
 
+function useAutosave(value, saveFn, enabled, delay = 800) {
+  const [state, setState] = useState("idle");
+  const [savedAt, setSavedAt] = useState(null);
+  const [error, setError] = useState(null);
+  const saveFnRef = useRef(saveFn);
+
+  useEffect(() => {
+    saveFnRef.current = saveFn;
+  }, [saveFn]);
+
+  useEffect(() => {
+    if (!enabled) return undefined;
+    setState("saving");
+    setError(null);
+
+    const timer = setTimeout(async () => {
+      try {
+        await saveFnRef.current(value);
+        setState("saved");
+        setSavedAt(Date.now());
+        setTimeout(() => setState(s => s === "saved" ? "idle" : s), 2400);
+      } catch (err) {
+        setState("error");
+        setError(err.message || "No se pudo guardar");
+      }
+    }, delay);
+
+    return () => clearTimeout(timer);
+  }, [value, enabled, delay]);
+
+  return { state, savedAt, error };
+}
+
+function SaveStatus({ state, savedAt, error, onRetry }) {
+  const seconds = savedAt ? Math.max(0, Math.round((Date.now() - savedAt) / 1000)) : null;
+  const map = {
+    idle: {
+      color: C.textDim,
+      icon: "○",
+      label: savedAt ? `Guardado · hace ${seconds}s` : "Sin cambios",
+    },
+    saving: { color: C.yellow, icon: "◐", label: "Guardando..." },
+    saved: { color: C.green, icon: "✓", label: "Guardado" },
+    error: { color: C.red, icon: "!", label: error || "Error al guardar" },
+  }[state] || { color: C.textDim, icon: "○", label: "Sin cambios" };
+
+  return (
+    <div style={{
+      display: "inline-flex",
+      alignItems: "center",
+      gap: 8,
+      padding: "4px 10px",
+      minHeight: 24,
+      borderRadius: C.radiusSm,
+      background: state === "saved" ? C.greenSoft : state === "error" ? C.redSoft : "transparent",
+      border: `1px solid ${state === "saved" ? "rgba(52,211,153,0.22)" : state === "error" ? "rgba(248,113,113,0.22)" : C.border}`,
+      transition: `all 200ms ${C.ease}`,
+    }}>
+      <span style={{
+        color: map.color,
+        fontSize: 11,
+        fontFamily: C.fontMono,
+        animation: state === "saving" ? "auken-spin 1.2s linear infinite" : "none",
+        display: "inline-block",
+      }}>
+        {map.icon}
+      </span>
+      <span style={{ fontSize: 11, color: map.color, fontWeight: 500, fontFamily: C.fontSans, letterSpacing: "-0.005em" }}>
+        {map.label}
+      </span>
+      {state === "error" && onRetry && (
+        <button onClick={onRetry} style={{
+          background: "transparent",
+          border: "none",
+          color: C.red,
+          fontSize: 11,
+          fontWeight: 600,
+          cursor: "pointer",
+          padding: 0,
+        }}>
+          Reintentar
+        </button>
+      )}
+      <style>{`
+        @keyframes auken-spin { to { transform: rotate(360deg); } }
+      `}</style>
+    </div>
+  );
+}
+
+function ConfigField({ label, hint, error, success, children }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", gap: 8 }}>
+        <label style={{
+          fontSize: 11,
+          fontWeight: 600,
+          color: C.textDim,
+          textTransform: "uppercase",
+          letterSpacing: "0.05em",
+          fontFamily: C.fontSans,
+        }}>
+          {label}
+        </label>
+        {success && (
+          <span style={{
+            fontSize: 10,
+            color: C.green,
+            fontWeight: 600,
+            fontFamily: C.fontMono,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 3,
+            animation: "auken-fade-in 200ms ease-out",
+            flexShrink: 0,
+          }}>
+            ✓ guardado
+          </span>
+        )}
+      </div>
+      {children}
+      {error && (
+        <span style={{ fontSize: 11, color: C.red, fontWeight: 500, fontFamily: C.fontSans, display: "inline-flex", alignItems: "center", gap: 4 }}>
+          <span style={{ fontFamily: C.fontMono }}>!</span> {error}
+        </span>
+      )}
+      {hint && !error && (
+        <span style={{ fontSize: 11, color: C.textMuted, fontFamily: C.fontSans }}>{hint}</span>
+      )}
+      <style>{`
+        @keyframes auken-fade-in {
+          from { opacity: 0; transform: translateY(-2px); }
+          to { opacity: 1; transform: none; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 // Skeleton loading — mantiene layout y evita la sensación de "pantalla esperando".
 function Skeleton({ w = "100%", h = 12, r = 4, style = {} }) {
   return (
@@ -1484,9 +1623,6 @@ function TabCitas({ citas, refresh, optica, pacientes }) {
 function TabConfiguracion({ optica, refresh }) {
   const [edit, setEdit] = useState(optica);
   const [dirty, setDirty] = useState(false);   // true = hay cambios sin guardar
-  const [saving, setSaving] = useState(false);
-  const [saved, setSaved] = useState(false);
-  const [saveError, setSaveError] = useState(null);
   // Guarda el último payload guardado para que el useEffect no lo pise
   // cuando refresh() devuelve datos de BD que aún no tienen la columna servicios
   // (es decir, antes de ejecutar la migración 007)
@@ -1504,32 +1640,28 @@ function TabConfiguracion({ optica, refresh }) {
   const upd = (field, value) => {
     setEdit(prev => ({ ...prev, [field]: value }));
     setDirty(true);
-    setSaved(false);
   };
 
-  const save = async () => {
-    setSaving(true);
-    setSaveError(null);
-
+  const saveConfig = useCallback(async (nextEdit) => {
     // Asegurarse de que servicios/escalar_si sean arrays JSON válidos
-    const serviciosClean = Array.isArray(edit.servicios)
-      ? edit.servicios.filter(s => s && (s.nombre || s.precio))
+    const serviciosClean = Array.isArray(nextEdit.servicios)
+      ? nextEdit.servicios.filter(s => s && (s.nombre || s.precio))
       : [];
-    const escalarSiClean = Array.isArray(edit.escalar_si)
-      ? edit.escalar_si.filter(Boolean)
+    const escalarSiClean = Array.isArray(nextEdit.escalar_si)
+      ? nextEdit.escalar_si.filter(Boolean)
       : [];
 
     const payload = {
-      nombre:              edit.nombre            || "",
-      slogan:              edit.slogan            || "",
-      direccion:           edit.direccion         || "",
-      ciudad:              edit.ciudad            || "",
-      telefono:            edit.telefono          || "",
-      whatsapp:            edit.whatsapp          || "",
-      horario:             edit.horario           || "",
-      numero_escalada:     edit.numero_escalada   || "",
-      bot_nombre:          edit.bot_nombre        || "Aukén",
-      promocion_estrella:  edit.promocion_estrella|| "",
+      nombre:              nextEdit.nombre            || "",
+      slogan:              nextEdit.slogan            || "",
+      direccion:           nextEdit.direccion         || "",
+      ciudad:              nextEdit.ciudad            || "",
+      telefono:            nextEdit.telefono          || "",
+      whatsapp:            nextEdit.whatsapp          || "",
+      horario:             nextEdit.horario           || "",
+      numero_escalada:     nextEdit.numero_escalada   || "",
+      bot_nombre:          nextEdit.bot_nombre        || "Aukén",
+      promocion_estrella:  nextEdit.promocion_estrella|| "",
       servicios:           serviciosClean,
       escalar_si:          escalarSiClean,
     };
@@ -1539,17 +1671,21 @@ function TabConfiguracion({ optica, refresh }) {
       .update(payload)
       .eq("id", optica.id);
 
-    setSaving(false);
     if (!error) {
-      setSaved(true);
       lastSavedRef.current = payload;  // ← preserva lo guardado ante refresh() con BD sin migración 007
       setDirty(false);                 // ← limpia dirty para que el useEffect sincronice (con merge)
       refresh();
-      setTimeout(() => setSaved(false), 3000);
     } else {
       console.error("[config] Error guardando:", error);
-      setSaveError(error.message);
+      throw new Error(error.message);
     }
+  }, [optica?.id, refresh]);
+
+  const autosave = useAutosave(edit, saveConfig, dirty && !!optica?.id, 800);
+  const fieldSaved = autosave.state === "saved";
+  const retrySave = () => {
+    setDirty(false);
+    setTimeout(() => setDirty(true), 0);
   };
 
   const updateServicio = (idx, key, value) => {
@@ -1568,11 +1704,10 @@ function TabConfiguracion({ optica, refresh }) {
   };
 
   const Field = ({ label, value, onChange, ph }) => (
-    <div>
-      <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: C.textDim, textTransform: "uppercase", marginBottom: 6, letterSpacing: "0.05em" }}>{label}</label>
+    <ConfigField label={label} success={fieldSaved}>
       <input value={value || ""} onChange={(e) => onChange(e.target.value)} placeholder={ph}
         style={{ width: "100%", background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13 }} />
-    </div>
+    </ConfigField>
   );
 
   // Detectar si la BD aún no tiene la columna servicios (migración 007 pendiente)
@@ -1600,11 +1735,7 @@ function TabConfiguracion({ optica, refresh }) {
       <div style={{ marginBottom: 24 }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 6 }}>
           <h3 style={{ fontSize: 18, fontWeight: 700, color: C.text }}>⚙️ Configuración de la Óptica</h3>
-          {dirty && (
-            <span style={{ fontSize: 11, color: C.amber, fontWeight: 700, background: `${C.amber}15`, border: `1px solid ${C.amber}40`, padding: "3px 10px", borderRadius: 12 }}>
-              ● Cambios sin guardar
-            </span>
-          )}
+          <SaveStatus state={autosave.state} savedAt={autosave.savedAt} error={autosave.error} onRetry={retrySave} />
         </div>
         <p style={{ fontSize: 13, color: C.textDim }}>Estos datos los usa el bot Aukén automáticamente en cada conversación.</p>
       </div>
@@ -1671,32 +1802,17 @@ function TabConfiguracion({ optica, refresh }) {
         </div>
 
         {/* ERROR */}
-        {saveError && (
+        {autosave.state === "error" && (
           <div style={{ background: `${C.red}15`, border: `1px solid ${C.red}40`, borderRadius: 8, padding: "10px 14px", fontSize: 12, color: C.red }}>
-            ⚠️ Error al guardar: {saveError}
+            ⚠️ Error al guardar: {autosave.error}
             <br /><span style={{ color: C.textDim, fontSize: 11 }}>
               Si el error menciona una columna, ejecuta la migración 007 en Supabase SQL Editor.
             </span>
+            <button onClick={retrySave} style={{ marginLeft: 10, background: "transparent", border: "none", color: C.red, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+              Reintentar
+            </button>
           </div>
         )}
-
-        {/* GUARDAR */}
-        <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 12 }}>
-          <button
-            onClick={save}
-            disabled={saving || !dirty}
-            style={{
-              background: saved ? C.green : dirty ? C.primary : `${C.primary}50`,
-              color: "#000",
-              border: "none", borderRadius: 8, padding: "12px 28px",
-              fontSize: 14, fontWeight: 700,
-              cursor: (saving || !dirty) ? "default" : "pointer",
-              opacity: saving ? 0.6 : 1, transition: "all .2s",
-            }}
-          >
-            {saving ? "Guardando..." : saved ? "✓ Guardado" : dirty ? "💾 Guardar cambios" : "Sin cambios"}
-          </button>
-        </div>
       </div>
     </Card>
   );
