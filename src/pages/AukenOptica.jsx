@@ -3,8 +3,9 @@ import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useToaster } from "../components/Toaster";
 import Icon from "../components/Icon";
+import { formatRut, formatVisit, labelMeta, sanitizeNotas } from "../lib/labels";
 
-// Hook responsive — detecta tamaño de pantalla
+// Hook responsive â€” detecta tamaÃ±o de pantalla
 function useViewport() {
   const [w, setW] = useState(typeof window !== "undefined" ? window.innerWidth : 1024);
   useEffect(() => {
@@ -15,7 +16,7 @@ function useViewport() {
   return { w, isMobile: w < 768, isTablet: w >= 768 && w < 1100 };
 }
 
-// ── Design Tokens v2 (Linear.app × Vercel Dashboard) ────────────
+// â”€â”€ Design Tokens v2 (Linear.app Ã— Vercel Dashboard) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const C = {
   // surfaces
   bg:        '#08090C',
@@ -58,17 +59,17 @@ const C = {
   dur:       '160ms',
 };
 
-// ── Respuestas rápidas ────────────────────────────────────────────────────────
+// â”€â”€ Respuestas rÃ¡pidas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const QUICK_REPLIES = [
-  { label: "Saludo",    text: "Hola 👋, ¿en qué puedo ayudarte hoy?" },
-  { label: "Un momento", text: "Un momento por favor, revisando tu caso 🔍" },
-  { label: "Confirmar cita", text: "Tu cita ha sido confirmada ✅. Te esperamos." },
-  { label: "Receta",    text: "Para revisar tu receta necesito que vengas a la óptica o nos envíes una foto 📸" },
-  { label: "Horario",   text: "Nuestro horario es Lun–Vie 11:30 a 18:30 hrs 🕐" },
-  { label: "Gracias",   text: "Muchas gracias 😊 que tengas un excelente día." },
+  { label: "Saludo",    text: "Hola ðŸ‘‹, Â¿en quÃ© puedo ayudarte hoy?" },
+  { label: "Un momento", text: "Un momento por favor, revisando tu caso ðŸ”" },
+  { label: "Confirmar cita", text: "Tu cita ha sido confirmada âœ…. Te esperamos." },
+  { label: "Receta",    text: "Para revisar tu receta necesito que vengas a la Ã³ptica o nos envÃ­es una foto ðŸ“¸" },
+  { label: "Horario",   text: "Nuestro horario es Lunâ€“Vie 11:30 a 18:30 hrs ðŸ•" },
+  { label: "Gracias",   text: "Muchas gracias ðŸ˜Š que tengas un excelente dÃ­a." },
 ];
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
+// â”€â”€ Helpers â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const DASHBOARD_PATH = "/optica/dashboard";
 
 function dashboardUrl() {
@@ -151,7 +152,7 @@ function diasReceta(fecha) {
   return Math.floor((Date.now() - new Date(fecha).getTime()) / 86400000);
 }
 
-// ── Micro ─────────────────────────────────────────────────────────────────────
+// â”€â”€ Micro â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function Dot({ color, size = 8, glow, pulse }) {
   return (
     <span style={{ position: "relative", display: "inline-flex", alignItems: "center", justifyContent: "center", width: size, height: size, flexShrink: 0 }}>
@@ -192,7 +193,7 @@ function ChatBubble({ kind, author, text, time, meta }) {
         }}>
           <span style={{ width: 5, height: 5, borderRadius: "50%", background: C.blue, boxShadow: `0 0 8px ${C.blue}`, flexShrink: 0 }} />
           <span style={{ whiteSpace: "pre-wrap" }}>{text}</span>
-          {meta && <span style={{ color: C.inkFaint }}>· {meta}</span>}
+          {meta && <span style={{ color: C.inkFaint }}>Â· {meta}</span>}
         </div>
       </div>
     );
@@ -232,7 +233,7 @@ function ChatBubble({ kind, author, text, time, meta }) {
       <div style={{ maxWidth: "72%", display: "flex", flexDirection: "column", gap: 4 }}>
         {kind === "bot" && (
           <span style={{ fontSize: 10, color: C.primary, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>
-            AUKÉN IA {meta && <span style={{ color: C.inkFaint, fontWeight: 500 }}>· {meta}</span>}
+            AUKÃ‰N IA {meta && <span style={{ color: C.inkFaint, fontWeight: 500 }}>Â· {meta}</span>}
           </span>
         )}
         {kind === "operator" && (
@@ -255,7 +256,7 @@ function ChatBubble({ kind, author, text, time, meta }) {
   );
 }
 
-// ── Sidebar row ───────────────────────────────────────────────────────────────
+// â”€â”€ Sidebar row â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function StatusPill({ type }) {
   const map = {
     pending: ["Pendiente", C.amber, "rgba(251,191,36,0.10)"],
@@ -291,7 +292,7 @@ function PatientRow({ p, active, onClick, lastMsg, unread }) {
   const waiting = waitingSeconds(lastMsg);
   const isCritical = waiting > 600;
   const kind = lastMsg?.remitente === "cliente" ? "pending" : lastMsg?.remitente === "admin" ? "human" : "bot";
-  const preview = lastMsg?.contenido || p.telefono || "Sin mensajes todavía";
+  const preview = lastMsg?.contenido || p.telefono || "Sin mensajes todavÃ­a";
 
   return (
     <button
@@ -491,28 +492,29 @@ function ConvListHeader({ search, setSearch, filter, setFilter, count, totalUnre
   );
 }
 
-// ── Panel ficha derecho ───────────────────────────────────────────────────────
+// â”€â”€ Panel ficha derecho â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function PatientPanel({ p, onClose, onGoToDashboard }) {
   if (!p) return null;
+  const cleanNotas = sanitizeNotas(p.notas_clinicas);
   const dias = diasReceta(p.fecha_ultima_visita);
   const recetaColor = dias === null ? C.inkFaint : dias > 365 ? C.red : dias > 335 ? C.amber : C.green;
-  const recetaLabel = dias === null ? "Sin receta" : dias > 365 ? `Vencida (${dias}d)` : dias > 335 ? `Próxima (${365 - dias}d)` : "Vigente";
+  const recetaLabel = dias === null ? "Sin receta" : dias > 365 ? `Vencida (${dias}d)` : dias > 335 ? `PrÃ³xima (${365 - dias}d)` : "Vigente";
 
   const fields = [
-    ["RUT",           p.rut],
-    ["Teléfono",      p.telefono],
+    ["RUT",           formatRut(p.rut)],
+    ["TelÃ©fono",      p.telefono],
     ["Comuna",        p.comuna],
-    ["Última visita", p.fecha_ultima_visita],
-    ["Próx. control", p.fecha_proximo_control],
+    ["Ãšltima visita", formatVisit(p.fecha_ultima_visita)],
+    ["PrÃ³x. control", formatVisit(p.fecha_proximo_control)],
     ["Producto",      p.producto_actual],
-    ["Estado compra", p.estado_compra],
+    ["Estado compra", labelMeta("compraState", p.estado_compra || "Pendiente").label],
   ];
 
   return (
     <aside style={{ width: 270, borderLeft: `1px solid ${C.border}`, background: C.surface, display: "flex", flexDirection: "column", flexShrink: 0 }}>
       <div style={{ padding: "16px 18px 12px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontSize: 10, fontWeight: 700, color: C.inkFaint, textTransform: "uppercase", letterSpacing: "0.08em" }}>Ficha Paciente</span>
-        <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.inkFaint, cursor: "pointer", fontSize: 18, lineHeight: 1 }}>×</button>
+        <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.inkFaint, cursor: "pointer", fontSize: 18, lineHeight: 1 }}>Ã—</button>
       </div>
 
       <div style={{ flex: 1, overflowY: "auto", padding: 18 }}>
@@ -529,7 +531,7 @@ function PatientPanel({ p, onClose, onGoToDashboard }) {
           <div style={{ fontWeight: 700, fontSize: 14, color: C.ink }}>{p.nombre}</div>
           <div style={{ marginTop: 6, display: "flex", justifyContent: "center", gap: 6, flexWrap: "wrap" }}>
             <Tag label={recetaLabel} color={recetaColor} />
-            {p.estado_compra === "Compró" && <Tag label="Cliente" color={C.green} />}
+            {p.estado_compra === "ComprÃ³" && <Tag label="Cliente" color={C.green} />}
           </div>
           {p.monto_venta && (
             <div style={{ marginTop: 8, fontSize: 14, color: C.green, fontWeight: 800 }}>
@@ -543,7 +545,7 @@ function PatientPanel({ p, onClose, onGoToDashboard }) {
           {fields.map(([label, val]) => (
             <div key={label}>
               <div style={{ fontSize: 9, color: C.inkFaint, textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.07em", marginBottom: 2 }}>{label}</div>
-              <div style={{ fontSize: 12, color: val ? C.ink : C.inkFaint }}>{val || "—"}</div>
+              <div style={{ fontSize: 12, color: val ? C.ink : C.inkFaint }}>{val || "â€”"}</div>
             </div>
           ))}
         </div>
@@ -556,7 +558,7 @@ function PatientPanel({ p, onClose, onGoToDashboard }) {
               <div key={eye} style={{ fontSize: 11, marginBottom: 4 }}>
                 <span style={{ color: C.primary, fontWeight: 700 }}>{eye} </span>
                 <span style={{ color: C.inkMid }}>
-                  {d.esfera && `Esf ${d.esfera}`}{d.cilindro && ` · Cil ${d.cilindro}`}{d.eje && ` · Eje ${d.eje}°`}
+                  {d.esfera && `Esf ${d.esfera}`}{d.cilindro && ` Â· Cil ${d.cilindro}`}{d.eje && ` Â· Eje ${d.eje}Â°`}
                 </span>
               </div>
             ))}
@@ -564,10 +566,10 @@ function PatientPanel({ p, onClose, onGoToDashboard }) {
         )}
 
         {/* Notas */}
-        {p.notas_clinicas && (
+        {cleanNotas && (
           <div style={{ marginTop: 12, background: C.surfaceL, borderRadius: 8, padding: 12, border: `1px solid ${C.border}` }}>
-            <div style={{ fontSize: 9, color: C.inkFaint, fontWeight: 700, marginBottom: 5, textTransform: "uppercase" }}>Notas clínicas</div>
-            <div style={{ fontSize: 11, color: C.inkMid, lineHeight: 1.6 }}>{p.notas_clinicas}</div>
+            <div style={{ fontSize: 9, color: C.inkFaint, fontWeight: 700, marginBottom: 5, textTransform: "uppercase" }}>Notas clÃ­nicas</div>
+            <div style={{ fontSize: 11, color: C.inkMid, lineHeight: 1.6 }}>{cleanNotas}</div>
           </div>
         )}
       </div>
@@ -590,7 +592,7 @@ function PatientPanel({ p, onClose, onGoToDashboard }) {
   );
 }
 
-// ── Componente principal ──────────────────────────────────────────────────────
+// â”€â”€ Componente principal â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 export default function AukenOptica() {
   const navigate = useNavigate();
   const bottomRef  = useRef(null);
@@ -598,14 +600,14 @@ export default function AukenOptica() {
   const sendingRef = useRef(false);
   const { isMobile, isTablet } = useViewport();
   const { toast } = useToaster();
-  const [showSidebar, setShowSidebar] = useState(false); // móvil: drawer cerrado por defecto
+  const [showSidebar, setShowSidebar] = useState(false); // mÃ³vil: drawer cerrado por defecto
 
   const [activeP,   setActiveP]   = useState(null);
   const [patients,  setPatients]  = useState([]);
   const [messages,  setMessages]  = useState([]);
   const [lastMsgs,  setLastMsgs]  = useState({});
-  const [unreadMap, setUnreadMap] = useState({});      // paciente_id → count
-  const [seenMap,   setSeenMap]   = useState(() => {   // última marca de lectura por paciente
+  const [unreadMap, setUnreadMap] = useState({});      // paciente_id â†’ count
+  const [seenMap,   setSeenMap]   = useState(() => {   // Ãºltima marca de lectura por paciente
     try { return JSON.parse(localStorage.getItem("auken_seen") || "{}"); } catch { return {}; }
   });
   const [inputText,  setInputText]  = useState("");
@@ -629,7 +631,7 @@ export default function AukenOptica() {
   const [iaThinking, setIaThinking] = useState(false);
   const [creandoDemo, setCreandoDemo] = useState(false);
 
-  // ── Carga pacientes ──────────────────────────────────────────────────────────
+  // â”€â”€ Carga pacientes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const refresh = useCallback(async () => {
     const { data: pacs } = await supabase.from("pacientes").select("*").order("created_at", { ascending: false });
     if (!pacs) return;
@@ -656,11 +658,11 @@ export default function AukenOptica() {
     setLoading(false);
   }, []);
 
-  // ── Demo: crear cliente placeholder para probar el flujo de registro IA ─────
+  // â”€â”€ Demo: crear cliente placeholder para probar el flujo de registro IA â”€â”€â”€â”€â”€
   const crearDemoCliente = useCallback(async () => {
     setCreandoDemo(true);
     try {
-      // Buscar la óptica para obtener optica_id
+      // Buscar la Ã³ptica para obtener optica_id
       const { data: opticaRow } = await supabase.from("opticas")
         .select("id").eq("slug", "glowvision").maybeSingle();
 
@@ -668,7 +670,7 @@ export default function AukenOptica() {
       const { data: nuevo, error } = await supabase.from("pacientes").insert({
         nombre: "Cliente Demo (sin registrar)",
         telefono: fakePhone,
-        notas_clinicas: "Placeholder de prueba IA. El bot debería pedirle nombre/RUT y completar este registro automáticamente.",
+        notas_clinicas: "Placeholder de prueba IA. El bot deberÃ­a pedirle nombre/RUT y completar este registro automÃ¡ticamente.",
         tags: ["demo-pending"],
         optica_id: opticaRow?.id,
         estado_compra: "Pendiente",
@@ -682,7 +684,7 @@ export default function AukenOptica() {
       setShowPanel(false);
       setShowSidebar(false);
       toast.info("Demo iniciada", {
-        sub: "Escribe como cliente — la IA pedirá tus datos y completará el registro automáticamente",
+        sub: "Escribe como cliente â€” la IA pedirÃ¡ tus datos y completarÃ¡ el registro automÃ¡ticamente",
         duration: 7000,
       });
     } catch (err) {
@@ -692,12 +694,12 @@ export default function AukenOptica() {
     }
   }, [toast]);
 
-  // ── Carga chat ───────────────────────────────────────────────────────────────
+  // â”€â”€ Carga chat â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const loadChat = useCallback(async (pId) => {
     if (!pId) return;
     const { data } = await supabase.from("mensajes_chat").select("*").eq("paciente_id", pId).order("created_at", { ascending: true });
     setMessages(dedupeMessages(data || []));
-    // Marcar como leído
+    // Marcar como leÃ­do
     const now = new Date().toISOString();
     const updated = { ...JSON.parse(localStorage.getItem("auken_seen") || "{}"), [pId]: now };
     localStorage.setItem("auken_seen", JSON.stringify(updated));
@@ -710,7 +712,7 @@ export default function AukenOptica() {
   useEffect(() => { if (activeP) loadChat(activeP.id); }, [activeP, loadChat]);
   useEffect(() => { bottomRef.current?.scrollIntoView({ behavior: "smooth" }); }, [messages]);
 
-  // ── Real-time multi-dispositivo: mensajes + pacientes + citas ───────────────
+  // â”€â”€ Real-time multi-dispositivo: mensajes + pacientes + citas â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   useEffect(() => {
     const sub = supabase.channel("auken_live")
       // Mensajes nuevos
@@ -721,7 +723,7 @@ export default function AukenOptica() {
           setMessages(prev => dedupeMessages([...prev, m]));
         } else if (m.remitente === "cliente") {
           setUnreadMap(prev => ({ ...prev, [m.paciente_id]: (prev[m.paciente_id] || 0) + 1 }));
-          // Alerta visual + toast notificación
+          // Alerta visual + toast notificaciÃ³n
           setPatients(prev => {
             const p = prev.find(x => x.id === m.paciente_id);
             if (p) {
@@ -736,9 +738,9 @@ export default function AukenOptica() {
           });
           setTimeout(() => setNewMsgAlert(null), 4000);
         } else if (m.remitente === "bot" && m.metadata?.type === "system_booking_confirmation") {
-          // Notificar al operador que el bot agendó algo
-          toast.cita("IA agendó una cita", {
-            sub: m.contenido?.split("\n")[0]?.replace("✅ ", "") || "Nueva cita agendada por la IA",
+          // Notificar al operador que el bot agendÃ³ algo
+          toast.cita("IA agendÃ³ una cita", {
+            sub: m.contenido?.split("\n")[0]?.replace("âœ… ", "") || "Nueva cita agendada por la IA",
             action: m.metadata?.calendar_url ? {
               label: "Google Calendar",
               onClick: () => window.open(m.metadata.calendar_url, "_blank"),
@@ -747,19 +749,19 @@ export default function AukenOptica() {
           });
         }
       })
-      // Pacientes (INSERT/UPDATE/DELETE) — sincroniza entre notebooks
+      // Pacientes (INSERT/UPDATE/DELETE) â€” sincroniza entre notebooks
       .on("postgres_changes", { event: "*", schema: "public", table: "pacientes" }, () => {
         refresh();
       })
-      // Citas (cuando bot IA agenda automáticamente desde otro dispositivo)
+      // Citas (cuando bot IA agenda automÃ¡ticamente desde otro dispositivo)
       .on("postgres_changes", { event: "*", schema: "public", table: "citas" }, () => {
-        // El monitor no muestra citas, pero el dashboard sí; el evento queda registrado.
+        // El monitor no muestra citas, pero el dashboard sÃ­; el evento queda registrado.
       })
       .subscribe();
     return () => supabase.removeChannel(sub);
   }, [activeP, refresh]);
 
-  // ── Enviar ───────────────────────────────────────────────────────────────────
+  // â”€â”€ Enviar â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const handleSend = async () => {
     if (!inputText.trim() || !activeP || sending || sendingRef.current) return;
     sendingRef.current = true;
@@ -767,7 +769,7 @@ export default function AukenOptica() {
     setSending(true);
 
     if (testMode) {
-      // 🧪 Modo prueba: el operador simula al cliente → Claude responde
+      // ðŸ§ª Modo prueba: el operador simula al cliente â†’ Claude responde
       const { error: e1 } = await supabase.from("mensajes_chat").insert([{
         paciente_id: activeP.id, remitente: "cliente", contenido: text,
       }]);
@@ -806,7 +808,7 @@ export default function AukenOptica() {
       } catch (err) {
         await supabase.from("mensajes_chat").insert([{
           paciente_id: activeP.id, remitente: "bot",
-          contenido: "⚠️ Error técnico: no pude conectar con la IA. Verifica ANTHROPIC_API_KEY en Vercel.",
+          contenido: "âš ï¸ Error tÃ©cnico: no pude conectar con la IA. Verifica ANTHROPIC_API_KEY en Vercel.",
         }]);
         await loadChat(activeP.id);
       }
@@ -830,7 +832,7 @@ export default function AukenOptica() {
     inputRef.current?.focus();
   };
 
-  // ── Filtrado ─────────────────────────────────────────────────────────────────
+  // â”€â”€ Filtrado â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const filtered = patients.filter(p => {
     const q = search.toLowerCase();
     if (q && !p.nombre?.toLowerCase().includes(q) && !p.telefono?.includes(q)) return false;
@@ -840,7 +842,7 @@ export default function AukenOptica() {
     return true;
   });
 
-  // ── Grupos de mensajes ───────────────────────────────────────────────────────
+  // â”€â”€ Grupos de mensajes â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   const grouped = messages.reduce((acc, m) => {
     const sep = dateSep(m.created_at);
     if (!acc.length || acc[acc.length - 1].sep !== sep) acc.push({ sep, msgs: [m] });
@@ -850,7 +852,7 @@ export default function AukenOptica() {
 
   const totalUnread = Object.values(unreadMap).reduce((a, b) => a + b, 0);
 
-  // ── Loading ──────────────────────────────────────────────────────────────────
+  // â”€â”€ Loading â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   if (loading) return (
     <div style={{ background: C.bg, color: C.ink, minHeight: "100vh", display: "flex", flexDirection: "column", fontFamily: C.fontSans }}>
       <style>{`
@@ -911,7 +913,7 @@ export default function AukenOptica() {
     </div>
   );
 
-  // ── Render ───────────────────────────────────────────────────────────────────
+  // â”€â”€ Render â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
   return (
     <div style={{ background: C.bg, height: "100vh", color: C.ink, fontFamily: "'Inter', sans-serif", display: "flex", flexDirection: "column", overflow: "hidden" }}>
       <style>{`
@@ -927,7 +929,7 @@ export default function AukenOptica() {
         @media (max-width: 768px){button.auken-touch{min-height:44px}}
       `}</style>
 
-      {/* ── TOAST nueva msg ─────────────────────────────────────────────── */}
+      {/* â”€â”€ TOAST nueva msg â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       {newMsgAlert && (
         <div style={{
           position: "fixed", top: 16, right: 16, zIndex: 999,
@@ -943,7 +945,7 @@ export default function AukenOptica() {
         </div>
       )}
 
-      {/* ── TOP NAV ─────────────────────────────────────────────────────── */}
+      {/* â”€â”€ TOP NAV â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <nav style={{
         height: 48, borderBottom: `1px solid ${C.border}`,
         background: C.surface,
@@ -955,12 +957,12 @@ export default function AukenOptica() {
           {isMobile && (
             <button onClick={() => setShowSidebar(v => !v)} aria-label="Abrir lista"
               style={{ background: "transparent", border: "none", color: C.ink, fontSize: 20, cursor: "pointer", padding: "4px 8px" }}>
-              ☰
+              â˜°
             </button>
           )}
           <div style={{ width: 26, height: 26, background: `linear-gradient(135deg, ${C.primary}, ${C.neon})`, borderRadius: C.radiusSm, display: "flex", alignItems: "center", justifyContent: "center", color: "#000", boxShadow: `0 0 10px ${C.primarySoft}` }}><Icon name="eye" size={14} strokeWidth={1.8} /></div>
           <span style={{ fontFamily: C.fontSans, fontWeight: 700, fontSize: 14, letterSpacing: '-0.02em' }}>Monitor</span>
-          <span style={{ color: C.inkFaint }}>·</span>
+          <span style={{ color: C.inkFaint }}>Â·</span>
           <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: C.green }}>
             <Dot color={C.green} size={6} glow pulse />
             <span style={{ fontWeight: 600 }}>EN VIVO</span>
@@ -983,10 +985,10 @@ export default function AukenOptica() {
         </div>
       </nav>
 
-      {/* ── BODY ────────────────────────────────────────────────────────── */}
+      {/* â”€â”€ BODY â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
       <div style={{ flex: 1, display: "flex", overflow: "hidden", position: "relative" }}>
 
-        {/* Overlay para cerrar drawer en móvil */}
+        {/* Overlay para cerrar drawer en mÃ³vil */}
         {isMobile && showSidebar && (
           <div onClick={() => setShowSidebar(false)} style={{
             position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)",
@@ -994,7 +996,7 @@ export default function AukenOptica() {
           }} />
         )}
 
-        {/* ── SIDEBAR ─────────────────────────────────────────────────── */}
+        {/* â”€â”€ SIDEBAR â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <aside style={{
           width: isMobile ? 280 : 290,
           borderRight: `1px solid ${C.border}`,
@@ -1020,7 +1022,7 @@ export default function AukenOptica() {
             totalUnread={totalUnread}
           />
 
-          {/* Botón demo: simular cliente desconocido */}
+          {/* BotÃ³n demo: simular cliente desconocido */}
           <div style={{ padding: "10px 10px 8px" }}>
             <button onClick={crearDemoCliente} disabled={creandoDemo} style={{
               width: "100%",
@@ -1031,8 +1033,8 @@ export default function AukenOptica() {
               fontSize: 11, fontWeight: 700, cursor: creandoDemo ? "default" : "pointer",
               opacity: creandoDemo ? 0.6 : 1, transition: "all 0.15s",
             }}
-            title="Crea un paciente placeholder para probar el flujo de registro automático de la IA">
-              {creandoDemo ? "Creando…" : <><Icon name="plus" size={12} /> Demo cliente nuevo</>}
+            title="Crea un paciente placeholder para probar el flujo de registro automÃ¡tico de la IA">
+              {creandoDemo ? "Creandoâ€¦" : <><Icon name="plus" size={12} /> Demo cliente nuevo</>}
             </button>
           </div>
 
@@ -1040,7 +1042,7 @@ export default function AukenOptica() {
           <div style={{ flex: 1, overflowY: "auto" }}>
             {filtered.length === 0 && (
               <div style={{ padding: "32px 20px", textAlign: "center", color: C.inkFaint, fontSize: 12 }}>
-                {search ? `Sin resultados` : "Sin pacientes aún."}
+                {search ? `Sin resultados` : "Sin pacientes aÃºn."}
               </div>
             )}
             {filtered.map(p => (
@@ -1062,7 +1064,7 @@ export default function AukenOptica() {
           </div>
         </aside>
 
-        {/* ── CHAT ────────────────────────────────────────────────────── */}
+        {/* â”€â”€ CHAT â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         <section style={{ flex: 1, display: "flex", flexDirection: "column", overflow: "hidden", background: "radial-gradient(ellipse at 55% 15%, #12182A 0%, #05060A 65%)" }}>
           {activeP ? (
             <>
@@ -1086,7 +1088,7 @@ export default function AukenOptica() {
                 <div style={{ display: "flex", gap: 6 }}>
                   <button onClick={() => refresh().then(() => loadChat(activeP.id))}
                     style={{ background: C.surfaceL, border: `1px solid ${C.border}`, color: C.inkMid, padding: "5px 10px", borderRadius: 7, fontSize: 11, cursor: "pointer", fontWeight: 600 }}>
-                    ↻
+                    â†»
                   </button>
                   <button onClick={() => setTestMode(v => !v)}
                     style={{
@@ -1100,7 +1102,7 @@ export default function AukenOptica() {
                   </button>
                   <button onClick={() => setShowQuick(v => !v)}
                     style={{ background: showQuick ? `${C.amber}20` : C.surfaceL, border: `1px solid ${showQuick ? C.amber + "50" : C.border}`, color: showQuick ? C.amber : C.inkMid, padding: "5px 10px", borderRadius: 7, fontSize: 11, cursor: "pointer", fontWeight: 600 }}>
-                    <Icon name="bolt" size={12} /> Rápidas
+                    <Icon name="bolt" size={12} /> RÃ¡pidas
                   </button>
                   <button onClick={() => setShowPanel(v => !v)}
                     style={{ background: showPanel ? `${C.primary}20` : C.surfaceL, border: `1px solid ${showPanel ? C.primary + "40" : C.border}`, color: showPanel ? C.primary : C.inkMid, padding: "5px 10px", borderRadius: 7, fontSize: 11, cursor: "pointer", fontWeight: 600 }}>
@@ -1117,11 +1119,11 @@ export default function AukenOptica() {
                   fontSize: 11, color: C.purple, fontWeight: 600, animation: "slideIn 0.2s ease-out",
                 }}>
                   <Icon name="bot" size={13} />
-                  <span>Modo Prueba: tus mensajes se enviarán como si fueras el cliente. Claude IA responderá automáticamente.</span>
+                  <span>Modo Prueba: tus mensajes se enviarÃ¡n como si fueras el cliente. Claude IA responderÃ¡ automÃ¡ticamente.</span>
                 </div>
               )}
 
-              {/* Respuestas rápidas expandible */}
+              {/* Respuestas rÃ¡pidas expandible */}
               {showQuick && (
                 <div style={{ padding: "8px 16px", borderBottom: `1px solid ${C.border}`, background: `${C.surfaceL}90`, display: "flex", gap: 6, flexWrap: "wrap", animation: "slideIn 0.2s ease-out" }}>
                   {QUICK_REPLIES.map(r => (
@@ -1146,7 +1148,7 @@ export default function AukenOptica() {
 
                 {iaThinking && (
                   <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "8px 14px", background: `${C.neon}10`, border: `1px solid ${C.neon}30`, borderRadius: 12, alignSelf: "flex-start", marginBottom: 10, animation: "fadeUp 0.2s" }}>
-                    <span style={{ fontSize: 11, color: C.neon, fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon name="bot" size={12} /> Aukén IA está pensando</span>
+                    <span style={{ fontSize: 11, color: C.neon, fontWeight: 700, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon name="bot" size={12} /> AukÃ©n IA estÃ¡ pensando</span>
                     <span style={{ display: "flex", gap: 3 }}>
                       {[0, 1, 2].map(i => (
                         <span key={i} style={{ width: 5, height: 5, borderRadius: "50%", background: C.neon, animation: `blink 1.4s infinite ${i * 0.2}s` }} />
@@ -1208,13 +1210,13 @@ export default function AukenOptica() {
                     border: "none", borderRadius: 8, padding: "7px 18px",
                     fontWeight: 700, fontSize: 12, cursor: inputText.trim() ? "pointer" : "default", transition: "all .15s", flexShrink: 0,
                   }}>
-                    {sending ? "…" : testMode ? "▶ Probar" : "Enviar"}
+                    {sending ? "â€¦" : testMode ? "â–¶ Probar" : "Enviar"}
                   </button>
                 </div>
                 <div style={{ fontSize: 10, color: C.inkFaint, marginTop: 5, paddingLeft: 2 }}>
                   {testMode
-                    ? "Modo Prueba activo — Claude IA responderá según el system prompt configurado"
-                    : "Enter para enviar · respuestas predefinidas · probar la IA"}
+                    ? "Modo Prueba activo â€” Claude IA responderÃ¡ segÃºn el system prompt configurado"
+                    : "Enter para enviar Â· respuestas predefinidas Â· probar la IA"}
                 </div>
               </div>
             </>
@@ -1231,7 +1233,7 @@ export default function AukenOptica() {
           )}
         </section>
 
-        {/* ── FICHA ────────────────────────────────────────────────────── */}
+        {/* â”€â”€ FICHA â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€ */}
         {activeP && showPanel && isMobile && (
           <div onClick={() => setShowPanel(false)} style={{
             position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)",
