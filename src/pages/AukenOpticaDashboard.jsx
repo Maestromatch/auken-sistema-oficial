@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback, useRef, memo } from "react";
+import { useState, useEffect, useCallback, useMemo, useRef, memo } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useToaster } from "../components/Toaster";
@@ -622,6 +622,252 @@ function ConfigField({ label, hint, error, success, children }) {
           to { opacity: 1; transform: none; }
         }
       `}</style>
+    </div>
+  );
+}
+
+function CommandPalette({ open, onClose, commands }) {
+  const [query, setQuery] = useState("");
+  const [active, setActive] = useState(0);
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    if (!open) return;
+    setQuery("");
+    setActive(0);
+    setTimeout(() => inputRef.current?.focus(), 50);
+  }, [open]);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  const filtered = useMemo(() => {
+    const q = query.toLowerCase().trim();
+    if (!q) return commands;
+    return commands
+      .map(group => ({
+        ...group,
+        items: group.items.filter(item =>
+          item.label.toLowerCase().includes(q) ||
+          item.subtitle?.toLowerCase().includes(q) ||
+          item.keywords?.some(k => String(k).toLowerCase().includes(q))
+        ),
+      }))
+      .filter(group => group.items.length > 0);
+  }, [commands, query]);
+
+  const flatItems = filtered.flatMap(group => group.items);
+
+  useEffect(() => {
+    if (active >= flatItems.length) setActive(Math.max(0, flatItems.length - 1));
+  }, [active, flatItems.length]);
+
+  const runItem = (item) => {
+    if (!item) return;
+    item.run?.();
+    onClose();
+  };
+
+  const onKeyDown = (e) => {
+    if (!flatItems.length) return;
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActive(a => (a + 1) % flatItems.length);
+    }
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActive(a => (a - 1 + flatItems.length) % flatItems.length);
+    }
+    if (e.key === "Enter") {
+      e.preventDefault();
+      runItem(flatItems[active]);
+    }
+  };
+
+  if (!open) return null;
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 1100,
+        background: "rgba(8,9,12,0.72)",
+        backdropFilter: "blur(8px) saturate(140%)",
+        WebkitBackdropFilter: "blur(8px) saturate(140%)",
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "center",
+        padding: "14vh 16px",
+        animation: `auken-backdrop-in 180ms ${C.ease}`,
+      }}
+    >
+      <div
+        onClick={e => e.stopPropagation()}
+        style={{
+          width: "100%",
+          maxWidth: 560,
+          background: C.surface,
+          border: `1px solid ${C.borderL}`,
+          borderRadius: 14,
+          boxShadow: "0 32px 80px rgba(0,0,0,0.7), 0 0 0 1px rgba(255,255,255,0.06), inset 0 1px 0 rgba(255,255,255,0.06)",
+          overflow: "hidden",
+          animation: `auken-modal-in 200ms ${C.ease}`,
+        }}
+      >
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "14px 18px",
+          borderBottom: `1px solid ${C.border}`,
+        }}>
+          <span style={{ color: C.textDim, fontSize: 14 }}>⌕</span>
+          <input
+            ref={inputRef}
+            value={query}
+            onChange={e => { setQuery(e.target.value); setActive(0); }}
+            onKeyDown={onKeyDown}
+            placeholder="Buscar paciente, cita o acción..."
+            style={{
+              flex: 1,
+              background: "transparent",
+              border: "none",
+              outline: "none",
+              color: C.text,
+              fontSize: 15,
+              fontFamily: C.fontSans,
+              letterSpacing: "-0.01em",
+              caretColor: C.primary,
+            }}
+          />
+          <kbd style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 2,
+            padding: "2px 6px",
+            borderRadius: 4,
+            background: C.surfaceL,
+            border: `1px solid ${C.border}`,
+            color: C.textDim,
+            fontSize: 10,
+            fontFamily: C.fontMono,
+          }}>
+            ESC
+          </kbd>
+        </div>
+
+        <div style={{ maxHeight: 380, overflowY: "auto", padding: "6px 0" }}>
+          {filtered.length === 0 && (
+            <div style={{ padding: "32px 18px", textAlign: "center", color: C.textDim, fontSize: 13 }}>
+              Sin resultados para "<span style={{ color: C.text }}>{query}</span>"
+            </div>
+          )}
+          {filtered.map(group => (
+            <div key={group.label}>
+              <div style={{
+                padding: "8px 18px 4px",
+                fontSize: 10,
+                fontWeight: 600,
+                color: C.textMuted,
+                letterSpacing: "0.08em",
+                textTransform: "uppercase",
+                fontFamily: C.fontSans,
+              }}>
+                {group.label}
+              </div>
+              {group.items.map(item => {
+                const idx = flatItems.indexOf(item);
+                const isActive = idx === active;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => runItem(item)}
+                    onMouseEnter={() => setActive(idx)}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 12,
+                      width: "100%",
+                      padding: "8px 18px",
+                      textAlign: "left",
+                      background: isActive ? C.surfaceL : "transparent",
+                      border: "none",
+                      cursor: "pointer",
+                      position: "relative",
+                    }}
+                  >
+                    {isActive && (
+                      <span style={{ position: "absolute", left: 0, top: 6, bottom: 6, width: 2, background: C.primary, borderRadius: "0 2px 2px 0" }} />
+                    )}
+                    <span style={{
+                      width: 24,
+                      height: 24,
+                      borderRadius: 6,
+                      background: C.bg,
+                      border: `1px solid ${C.border}`,
+                      color: isActive ? C.primary : C.textDim,
+                      display: "flex",
+                      alignItems: "center",
+                      justifyContent: "center",
+                      fontSize: 12,
+                      flexShrink: 0,
+                    }}>
+                      {item.icon}
+                    </span>
+                    <span style={{ flex: 1, fontSize: 13, color: C.text, fontWeight: 500, letterSpacing: "-0.005em", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {item.label}
+                    </span>
+                    {item.subtitle && (
+                      <span style={{ fontSize: 11, color: C.textDim, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 150 }}>
+                        {item.subtitle}
+                      </span>
+                    )}
+                    {item.shortcut && (
+                      <kbd style={{
+                        padding: "2px 6px",
+                        borderRadius: 4,
+                        background: C.bg,
+                        border: `1px solid ${C.border}`,
+                        color: C.textDim,
+                        fontSize: 10,
+                        fontFamily: C.fontMono,
+                      }}>
+                        {item.shortcut}
+                      </kbd>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+
+        <div style={{
+          display: "flex",
+          justifyContent: "space-between",
+          alignItems: "center",
+          padding: "8px 14px",
+          borderTop: `1px solid ${C.border}`,
+          background: C.bg,
+          fontSize: 10,
+          color: C.textDim,
+          fontFamily: C.fontMono,
+        }}>
+          <span style={{ display: "inline-flex", gap: 12 }}>
+            <span>↑↓ navegar</span>
+            <span>↵ ejecutar</span>
+          </span>
+          <span>AUKÉN Ctrl/⌘K</span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -1434,9 +1680,8 @@ function CitaModal({ opticaId, pacientes, onClose, refresh }) {
 // ─────────────────────────────────────────────────────────────
 // TAB: CITAS — tabla en desktop, tarjetas en mobile
 // ─────────────────────────────────────────────────────────────
-function TabCitas({ citas, refresh, optica, pacientes }) {
+function TabCitas({ citas, refresh, optica, pacientes, onCreateCita }) {
   const { isMobile } = useViewport();
-  const [showModal, setShowModal] = useState(false);
 
   const updateCita = async (id, estado) => {
     await supabase.from("citas").update({ estado }).eq("id", id);
@@ -1461,7 +1706,7 @@ function TabCitas({ citas, refresh, optica, pacientes }) {
             </div>
           </div>
           <button
-            onClick={() => setShowModal(true)}
+            onClick={onCreateCita}
             style={{ background: C.primary, color: "#000", border: "none", borderRadius: 6, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
           >
             + Nueva Cita
@@ -1476,7 +1721,7 @@ function TabCitas({ citas, refresh, optica, pacientes }) {
                 title="Agenda limpia"
                 body="El bot agenda automáticamente cuando conversa con un paciente. También puedes crear una cita manualmente."
                 cta="+ Nueva Cita"
-                onCta={() => setShowModal(true)}
+                onCta={onCreateCita}
                 accent={C.blue}
               />
             )}
@@ -1547,7 +1792,7 @@ function TabCitas({ citas, refresh, optica, pacientes }) {
                       title="Agenda limpia"
                       body="El bot agenda automáticamente. También puedes crear una cita manualmente con el botón superior."
                       cta="+ Nueva Cita"
-                      onCta={() => setShowModal(true)}
+                      onCta={onCreateCita}
                       accent={C.blue}
                     />
                   </td></tr>
@@ -1605,14 +1850,6 @@ function TabCitas({ citas, refresh, optica, pacientes }) {
           </div>
         )}
       </Card>
-      {showModal && (
-        <CitaModal
-          opticaId={optica?.id}
-          pacientes={pacientes || []}
-          onClose={() => setShowModal(false)}
-          refresh={refresh}
-        />
-      )}
     </>
   );
 }
@@ -2316,6 +2553,8 @@ export default function AukenOpticaDashboard() {
   const [error, setError] = useState(null);
   const [editingPatient, setEditingPatient] = useState(null);
   const [showPatientModal, setShowPatientModal] = useState(false);
+  const [showCitaModal, setShowCitaModal] = useState(false);
+  const [commandOpen, setCommandOpen] = useState(false);
 
   // Slug de la óptica (en F3 vendrá del usuario logueado)
   const OPTICA_SLUG = "glowvision";
@@ -2389,6 +2628,65 @@ export default function AukenOpticaDashboard() {
   useEffect(() => {
     if (optica) document.title = `${optica.nombre} | Aukén`;
   }, [optica?.nombre]);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        setCommandOpen(v => !v);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const openNewPatient = useCallback(() => {
+    setEditingPatient(null);
+    setShowPatientModal(true);
+  }, []);
+
+  const openEditPatient = useCallback((patient) => {
+    setEditingPatient(patient);
+    setShowPatientModal(true);
+    setTab("pacientes");
+  }, []);
+
+  const commands = useMemo(() => {
+    const pendingCitas = citas.filter(c => c.estado === "pendiente_confirmacion").length;
+
+    return [
+      {
+        label: "Navegar",
+        items: [
+          { id: "metrics", icon: "📊", label: "Ir a Métricas", shortcut: "G M", run: () => setTab("metricas") },
+          { id: "live", icon: "💬", label: "En Vivo", shortcut: "G V", run: () => setTab("enlive") },
+          { id: "patients", icon: "👥", label: "Pacientes", subtitle: `${pacientes.length}`, shortcut: "G P", run: () => setTab("pacientes") },
+          { id: "citas", icon: "📅", label: "Citas", subtitle: pendingCitas ? `${pendingCitas} pendientes` : `${citas.length}`, shortcut: "G C", run: () => setTab("citas") },
+          { id: "config", icon: "⚙️", label: "Configuración", shortcut: "G S", run: () => setTab("config") },
+          { id: "monitor", icon: "💬", label: "Abrir monitor de chat", shortcut: "G O", run: () => navigate("/optica") },
+        ],
+      },
+      {
+        label: "Acciones rápidas",
+        items: [
+          { id: "new-patient", icon: "+", label: "Nuevo paciente", shortcut: "N P", run: openNewPatient },
+          { id: "new-cita", icon: "+", label: "Nueva cita", shortcut: "N C", run: () => setShowCitaModal(true) },
+          { id: "scan-receta", icon: "◉", label: "Escanear receta", subtitle: "abre ficha paciente", shortcut: "O R", run: openNewPatient },
+        ],
+      },
+      {
+        label: "Pacientes",
+        items: pacientes.slice(0, 30).map(p => ({
+          id: `patient-${p.id}`,
+          icon: (p.nombre || "?")[0]?.toUpperCase() || "?",
+          label: p.nombre || "Sin nombre",
+          subtitle: p.telefono || p.rut || "",
+          keywords: [p.telefono, p.rut, p.comuna, p.producto_actual].filter(Boolean),
+          run: () => openEditPatient(p),
+        })),
+      },
+    ];
+  }, [citas, navigate, openEditPatient, openNewPatient, pacientes]);
 
   // Acción WhatsApp — normaliza número chileno y abre wa.me
   // NO es async porque window.open necesita estar en el contexto directo del evento
@@ -2469,6 +2767,11 @@ export default function AukenOpticaDashboard() {
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 6 : 12, flexShrink: 0 }}>
+          <button className="auken-touch" onClick={() => setCommandOpen(true)}
+            title="Abrir comandos (Ctrl/⌘K)"
+            style={{ background: C.surfaceL, border: `1px solid ${C.border}`, color: C.textDim, borderRadius: C.radius, padding: isMobile ? "5px 8px" : "5px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: C.fontMono, letterSpacing: 0 }}>
+            {isMobile ? "⌘K" : "Ctrl/⌘K"}
+          </button>
           <button className="auken-touch" onClick={() => navigate("/optica")}
             title="Ir al monitor de conversaciones"
             style={{ background: C.primarySoft, border: `1px solid ${C.primaryRing}`, color: C.primary, borderRadius: C.radius, padding: isMobile ? "5px 10px" : "5px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", letterSpacing: '-0.01em', transition: `background ${C.dur} ${C.ease}` }}>
@@ -2507,9 +2810,20 @@ export default function AukenOpticaDashboard() {
             onCreate={() => { setEditingPatient(null); setShowPatientModal(true); }}
           />
         )}
-        {tab === "citas" && <TabCitas citas={citas} refresh={refresh} optica={optica} pacientes={pacientes} />}
+        {tab === "citas" && <TabCitas citas={citas} refresh={refresh} optica={optica} pacientes={pacientes} onCreateCita={() => setShowCitaModal(true)} />}
         {tab === "config" && <TabConfiguracion optica={optica} refresh={refresh} />}
       </div>
+
+      <CommandPalette open={commandOpen} onClose={() => setCommandOpen(false)} commands={commands} />
+
+      {showCitaModal && (
+        <CitaModal
+          opticaId={optica?.id}
+          pacientes={pacientes || []}
+          onClose={() => setShowCitaModal(false)}
+          refresh={refresh}
+        />
+      )}
 
       {showPatientModal && (
         <PatientModal
