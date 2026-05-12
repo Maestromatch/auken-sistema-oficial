@@ -1132,6 +1132,157 @@ function Pill({ label, color }) {
 // ─────────────────────────────────────────────────────────────
 // QUEUE MONITOR (en línea)
 // ─────────────────────────────────────────────────────────────
+function avatarColor(name = "") {
+  const palette = ["#F97316", "#34D399", "#7DD3FC", "#FBBF24", "#A78BFA", "#F472B6", "#22D3EE"];
+  let h = 0;
+  for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) | 0;
+  return palette[Math.abs(h) % palette.length];
+}
+
+function Checkbox({ checked, onChange }) {
+  return (
+    <button
+      role="checkbox"
+      aria-checked={checked}
+      onClick={(e) => { e.stopPropagation(); onChange?.(); }}
+      style={{
+        width: 16, height: 16, borderRadius: 4,
+        background: checked ? C.primary : C.bg,
+        border: `1px solid ${checked ? C.primary : C.border}`,
+        cursor: "pointer", padding: 0,
+        display: "inline-flex", alignItems: "center", justifyContent: "center",
+        color: C.bg, fontSize: 10, fontWeight: 800,
+        transition: `all ${C.dur} ${C.ease}`,
+      }}
+    >
+      {checked && "✓"}
+    </button>
+  );
+}
+
+function CellIdentity({ name, sub, color = C.primary }) {
+  const initials = String(name || "?").split(" ").filter(Boolean).map(p => p[0]).slice(0, 2).join("").toUpperCase() || "?";
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
+      <div style={{
+        width: 28, height: 28, borderRadius: 8,
+        background: `${color}1A`, color, border: `1px solid ${color}33`,
+        display: "flex", alignItems: "center", justifyContent: "center",
+        fontSize: 11, fontWeight: 700, flexShrink: 0,
+      }}>
+        {initials}
+      </div>
+      <div style={{ display: "flex", flexDirection: "column", gap: 1, minWidth: 0 }}>
+        <span style={{ fontSize: 13, color: C.text, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+          {name || "Sin nombre"}
+        </span>
+        {sub && <span style={{ fontSize: 11, color: C.textDim, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{sub}</span>}
+      </div>
+    </div>
+  );
+}
+
+function DataTable({ rows, columns, onRowClick, rowActions, bulkActions, getRowId = r => r.id, empty }) {
+  const [selected, setSelected] = useState(new Set());
+  const [scrolled, setScrolled] = useState(false);
+  const allSelected = rows.length > 0 && selected.size === rows.length;
+
+  const toggleAll = () => setSelected(allSelected ? new Set() : new Set(rows.map(getRowId)));
+  const toggleOne = (id) => {
+    setSelected(prev => {
+      const next = new Set(prev);
+      next.has(id) ? next.delete(id) : next.add(id);
+      return next;
+    });
+  };
+
+  return (
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: 12, overflow: "hidden", position: "relative" }}>
+      {selected.size > 0 && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, padding: "10px 16px", background: "rgba(249,115,22,0.06)", borderBottom: "1px solid rgba(249,115,22,0.22)", animation: "auken-fade-in 180ms ease-out" }}>
+          <span style={{ fontSize: 12, color: C.primary, fontWeight: 700 }}>
+            {selected.size} {selected.size === 1 ? "seleccionado" : "seleccionados"}
+          </span>
+          <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
+            {bulkActions?.map(a => (
+              <button key={a.label} onClick={() => a.run(Array.from(selected))} style={{ height: 26, padding: "0 10px", borderRadius: 6, background: "transparent", color: C.text, border: `1px solid ${C.border}`, fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
+                {a.label}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div onScroll={e => setScrolled(e.currentTarget.scrollTop > 4)} style={{ maxHeight: "calc(100vh - 280px)", overflow: "auto" }}>
+        <table style={{ width: "100%", borderCollapse: "separate", borderSpacing: 0, fontFamily: C.fontSans, fontSize: 13, color: C.text }}>
+          <thead style={{ position: "sticky", top: 0, zIndex: 1, background: C.surfaceL, boxShadow: scrolled ? "0 4px 12px rgba(0,0,0,0.3)" : "none", transition: `box-shadow ${C.dur} ${C.ease}` }}>
+            <tr>
+              <th style={{ width: 36, padding: "10px 0 10px 16px", borderBottom: `1px solid ${C.border}` }}>
+                <Checkbox checked={allSelected} onChange={toggleAll} />
+              </th>
+              {columns.map(col => (
+                <th key={col.key} style={{ textAlign: col.align || "left", padding: "10px 16px", fontSize: 11, fontWeight: 600, color: C.textMuted, textTransform: "uppercase", letterSpacing: "0.06em", borderBottom: `1px solid ${C.border}`, whiteSpace: "nowrap", width: col.width }}>
+                  {col.label}
+                </th>
+              ))}
+              {rowActions && <th style={{ width: 96, borderBottom: `1px solid ${C.border}` }} />}
+            </tr>
+          </thead>
+          <tbody>
+            {rows.length === 0 && (
+              <tr>
+                <td colSpan={columns.length + (rowActions ? 2 : 1)}>{empty}</td>
+              </tr>
+            )}
+            {rows.map((row, i) => {
+              const id = getRowId(row);
+              const isSel = selected.has(id);
+              return (
+                <tr
+                  key={id}
+                  onClick={() => onRowClick?.(row)}
+                  className="auken-data-row"
+                  style={{ cursor: onRowClick ? "pointer" : "default", background: isSel ? "rgba(249,115,22,0.04)" : "transparent", transition: `background ${C.dur} ${C.ease}` }}
+                  onMouseEnter={e => !isSel && (e.currentTarget.style.background = "#13151A")}
+                  onMouseLeave={e => !isSel && (e.currentTarget.style.background = "transparent")}
+                >
+                  <td style={{ padding: "12px 0 12px 16px", borderBottom: i === rows.length - 1 ? "none" : `1px solid ${C.border}` }} onClick={e => e.stopPropagation()}>
+                    <Checkbox checked={isSel} onChange={() => toggleOne(id)} />
+                  </td>
+                  {columns.map(col => (
+                    <td key={col.key} style={{ padding: "12px 16px", textAlign: col.align || "left", borderBottom: i === rows.length - 1 ? "none" : `1px solid ${C.border}`, fontFamily: col.mono ? C.fontMono : C.fontSans, fontVariantNumeric: col.mono ? "tabular-nums" : "normal", color: col.muted ? C.textDim : C.text, whiteSpace: col.nowrap ? "nowrap" : "normal" }}>
+                      {col.render ? col.render(row) : row[col.key]}
+                    </td>
+                  ))}
+                  {rowActions && (
+                    <td className="auken-row-actions" style={{ padding: "8px 12px", borderBottom: i === rows.length - 1 ? "none" : `1px solid ${C.border}`, textAlign: "right" }} onClick={e => e.stopPropagation()}>
+                      <div style={{ display: "inline-flex", gap: 4, opacity: 0, transition: `opacity ${C.dur} ${C.ease}` }}>
+                        {rowActions(row).map(a => (
+                          <button key={a.label} onClick={a.run} title={a.label} style={{ width: 28, height: 28, borderRadius: 6, background: C.bg, border: `1px solid ${C.border}`, color: a.color || C.textDim, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center", fontSize: 12 }}>
+                            {a.icon}
+                          </button>
+                        ))}
+                      </div>
+                    </td>
+                  )}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+
+      <style>{`
+        .auken-data-row:hover .auken-row-actions > div { opacity: 1 !important; }
+        @keyframes auken-fade-in {
+          from { opacity: 0; transform: translateY(-2px); }
+          to { opacity: 1; transform: none; }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 function BotHealthBar({ status = "healthy", stats = [], onWake }) {
   const statusMap = {
     healthy: { color: C.green, label: "Operando en vivo", pulse: true },
@@ -1408,6 +1559,26 @@ function TabPacientes({ optica, pacientes, refresh, handleSendWhatsApp, onEdit, 
       })
     : pacientes;
 
+  const exportSelected = (ids) => {
+    const picked = filtered.filter(p => ids.includes(p.id));
+    const header = ["Nombre", "RUT", "Telefono", "Ultima visita", "Estado", "Monto"];
+    const lines = picked.map(p => [
+      p.nombre || "",
+      p.rut || "",
+      p.telefono || "",
+      p.fecha_ultima_visita || "",
+      p.estado_compra || "Pendiente",
+      p.monto_venta || "",
+    ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(","));
+    const blob = new Blob([[header.join(","), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "pacientes-auken.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <Card style={{ padding: 0 }}>
       <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
@@ -1483,7 +1654,72 @@ function TabPacientes({ optica, pacientes, refresh, handleSendWhatsApp, onEdit, 
         </div>
       ) : (
         /* DESKTOP: tabla completa */
-        <div style={{ overflowX: "auto" }}>
+        <>
+          <DataTable
+            rows={filtered}
+            onRowClick={onEdit}
+            empty={search
+              ? <div style={{ padding: 32, textAlign: "center", color: C.textDim, fontSize: 13 }}>Sin resultados para "<strong style={{ color: C.text }}>{search}</strong>"</div>
+              : <EmptyState
+                  title="Sin pacientes todavÃ­a"
+                  body="El bot los captura automÃ¡ticamente cuando llegan por WhatsApp. TambiÃ©n puedes agregar el primero manualmente."
+                  cta="+ Agregar paciente"
+                  onCta={onCreate}
+                  accent={C.primary}
+                />
+            }
+            columns={[
+              {
+                key: "paciente",
+                label: "Paciente",
+                width: "34%",
+                render: p => <CellIdentity name={p.nombre || "Sin nombre"} sub={`RUT: ${p.rut || "—"}`} color={avatarColor(p.nombre || "")} />,
+              },
+              {
+                key: "contacto",
+                label: "Contacto",
+                render: p => (
+                  <div>
+                    <div style={{ fontSize: 13, color: C.text }}>{p.telefono || "—"}</div>
+                    <div style={{ fontSize: 11, color: C.textDim, marginTop: 2 }}>Visita: {p.fecha_ultima_visita || "—"}</div>
+                  </div>
+                ),
+              },
+              {
+                key: "receta",
+                label: "Receta",
+                render: p => {
+                  const dias = p.fecha_ultima_visita
+                    ? Math.floor((Date.now() - new Date(p.fecha_ultima_visita).getTime()) / (1000 * 60 * 60 * 24))
+                    : null;
+                  const estado = dias === null ? "sin_datos" : dias > 365 ? "vencida" : dias > 335 ? "proxima" : "vigente";
+                  const estadoColor = estado === "vencida" ? C.red : estado === "proxima" ? C.amber : estado === "vigente" ? C.green : C.textMuted;
+                  const estadoLabel = estado === "vencida" ? `Vencida (${dias}d)` : estado === "proxima" ? `Próxima (${365 - dias}d)` : estado === "vigente" ? "Vigente" : "Sin receta";
+                  return <Pill label={estadoLabel} color={estadoColor} />;
+                },
+              },
+              {
+                key: "estado",
+                label: "Estado",
+                render: p => (
+                  <div>
+                    <Pill label={p.estado_compra || "Pendiente"} color={p.estado_compra === "Compró" ? C.green : p.estado_compra === "No Compró" ? C.red : C.textMuted} />
+                    {p.monto_venta && <div style={{ fontSize: 11, color: C.green, fontWeight: 700, marginTop: 2 }}>${Number(p.monto_venta).toLocaleString("es-CL")}</div>}
+                  </div>
+                ),
+              },
+            ]}
+            rowActions={p => [
+              { icon: "👁", label: "Ver ficha", color: C.primary, run: () => onEdit(p) },
+              { icon: "✎", label: "Editar", color: C.textDim, run: () => onEdit(p) },
+              { icon: "☎", label: "WhatsApp", color: "#25D366", run: () => handleSendWhatsApp(p) },
+            ]}
+            bulkActions={[
+              { label: "Exportar CSV", run: exportSelected },
+              { label: "Enviar recordatorio", run: ids => ids.map(id => filtered.find(p => p.id === id)).filter(Boolean).forEach(handleSendWhatsApp) },
+            ]}
+          />
+          <div style={{ display: "none", overflowX: "auto" }}>
           <table style={{ width: "100%", borderCollapse: "collapse" }}>
             <thead>
               <tr style={{ background: `${C.surfaceL}80` }}>
@@ -1552,6 +1788,7 @@ function TabPacientes({ optica, pacientes, refresh, handleSendWhatsApp, onEdit, 
             </tbody>
           </table>
         </div>
+        </>
       )}
     </Card>
   );
@@ -1774,9 +2011,80 @@ function TabCitas({ citas, refresh, optica, pacientes, onCreateCita }) {
               );
             })}
           </div>
-        ) : (
-          /* DESKTOP: tabla completa */
-          <div style={{ overflowX: "auto" }}>
+      ) : (
+        /* DESKTOP: tabla completa */
+          <>
+          <DataTable
+            rows={citas}
+            empty={
+              <EmptyState
+                title="Agenda limpia"
+                body="El bot agenda automÃ¡ticamente. TambiÃ©n puedes crear una cita manualmente con el botÃ³n superior."
+                cta="+ Nueva Cita"
+                onCta={onCreateCita}
+                accent={C.blue}
+              />
+            }
+            columns={[
+              {
+                key: "paciente",
+                label: "Paciente",
+                width: "28%",
+                render: c => <CellIdentity name={c.nombre || `Paciente #${c.paciente_id}`} sub={c.telefono || c.rut || ""} color={avatarColor(c.nombre || "")} />,
+              },
+              { key: "servicio", label: "Servicio", render: c => c.servicio || "—" },
+              {
+                key: "fecha",
+                label: "Fecha y hora",
+                nowrap: true,
+                mono: true,
+                render: c => <span>{c.fecha || "—"} {c.hora && `· ${c.hora}`}</span>,
+              },
+              {
+                key: "origen",
+                label: "Origen",
+                render: c => <Pill label={c.origen === "bot-ia" ? "🤖 IA" : (c.origen || "manual")} color={c.origen === "bot-ia" ? "#A78BFA" : C.blue} />,
+              },
+              {
+                key: "estado",
+                label: "Estado",
+                render: c => {
+                  const estadoColor = c.estado === "confirmada" ? C.green
+                    : c.estado === "cancelada" ? C.red
+                    : c.estado === "completada" ? C.blue : C.amber;
+                  return <Pill label={c.estado} color={estadoColor} />;
+                },
+              },
+              {
+                key: "calendar",
+                label: "Calendar",
+                render: c => {
+                  const calLink = c.fecha ? buildCalLinkForCita(c, optica) : null;
+                  if (!calLink) return <span style={{ color: C.textMuted }}>—</span>;
+                  return (
+                    <a href={calLink} target="_blank" rel="noopener noreferrer"
+                      onClick={e => e.stopPropagation()}
+                      style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 28, padding: "0 10px", borderRadius: 6, background: "rgba(66,133,244,0.15)", color: "#7DD3FC", border: "1px solid rgba(66,133,244,0.4)", fontSize: 11, fontWeight: 700, textDecoration: "none" }}>
+                      📅 Google
+                    </a>
+                  );
+                },
+              },
+            ]}
+            rowActions={c => {
+              const calLink = c.fecha ? buildCalLinkForCita(c, optica) : null;
+              return [
+                ...(calLink ? [{ icon: "📅", label: "Agregar a Google Calendar", color: "#7DD3FC", run: () => window.open(calLink, "_blank", "noopener,noreferrer") }] : []),
+                ...(c.estado === "pendiente_confirmacion" ? [{ icon: "✓", label: "Confirmar", color: C.green, run: () => updateCita(c.id, "confirmada") }] : []),
+                ...(c.estado !== "cancelada" ? [{ icon: "×", label: "Cancelar", color: C.red, run: () => updateCita(c.id, "cancelada") }] : []),
+              ];
+            }}
+            bulkActions={[
+              { label: "Confirmar", run: ids => ids.forEach(id => updateCita(id, "confirmada")) },
+              { label: "Cancelar", run: ids => ids.forEach(id => updateCita(id, "cancelada")) },
+            ]}
+          />
+          <div style={{ display: "none", overflowX: "auto" }}>
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ background: `${C.surfaceL}80` }}>
@@ -1848,6 +2156,7 @@ function TabCitas({ citas, refresh, optica, pacientes, onCreateCita }) {
               </tbody>
             </table>
           </div>
+          </>
         )}
       </Card>
     </>
