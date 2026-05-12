@@ -340,6 +340,153 @@ function DashboardTab({ active, icon, label, count, onClick }) {
   );
 }
 
+function Modal({ open = true, onClose, title, subtitle, children, footer, size = "md", icon }) {
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => {
+      if (e.key === "Escape") onClose?.();
+    };
+    const prevOverflow = document.body.style.overflow;
+    document.body.style.overflow = "hidden";
+    window.addEventListener("keydown", onKey);
+    return () => {
+      document.body.style.overflow = prevOverflow;
+      window.removeEventListener("keydown", onKey);
+    };
+  }, [open, onClose]);
+
+  if (!open) return null;
+
+  const widths = { sm: 400, md: 520, lg: 720, xl: 960 };
+
+  return (
+    <div
+      onClick={onClose}
+      style={{
+        position: "fixed",
+        inset: 0,
+        zIndex: 1000,
+        background: "rgba(8,9,12,0.72)",
+        backdropFilter: "blur(8px) saturate(140%)",
+        WebkitBackdropFilter: "blur(8px) saturate(140%)",
+        display: "flex",
+        alignItems: "flex-start",
+        justifyContent: "center",
+        padding: "8vh 16px 16px",
+        animation: `auken-backdrop-in 200ms ${C.ease}`,
+        overflowY: "auto",
+      }}
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        style={{
+          width: "100%",
+          maxWidth: widths[size] || widths.md,
+          background: C.surface,
+          border: `1px solid ${C.border}`,
+          borderRadius: 14,
+          boxShadow: "0 32px 64px rgba(0,0,0,0.6), 0 16px 32px rgba(0,0,0,0.4), 0 0 0 1px rgba(255,255,255,0.06), inset 0 1px 0 rgba(255,255,255,0.04)",
+          overflow: "hidden",
+          animation: `auken-modal-in 240ms ${C.ease}`,
+          position: "relative",
+        }}
+      >
+        <div style={{
+          display: "flex",
+          alignItems: "flex-start",
+          gap: 12,
+          padding: "20px 20px 16px",
+          borderBottom: `1px solid ${C.border}`,
+          background: "linear-gradient(180deg, rgba(255,255,255,0.02) 0%, transparent 100%)",
+          position: "sticky",
+          top: 0,
+          zIndex: 2,
+        }}>
+          {icon && (
+            <div style={{
+              width: 36,
+              height: 36,
+              borderRadius: 9,
+              background: C.primarySoft,
+              border: `1px solid ${C.primaryRing}`,
+              color: C.primary,
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 16,
+              flexShrink: 0,
+            }}>
+              {icon}
+            </div>
+          )}
+          <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 2 }}>
+            <h2 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: C.text, letterSpacing: "-0.015em" }}>
+              {title}
+            </h2>
+            {subtitle && (
+              <p style={{ margin: 0, fontSize: 13, color: C.textDim, lineHeight: 1.5 }}>
+                {subtitle}
+              </p>
+            )}
+          </div>
+          <button
+            onClick={onClose}
+            aria-label="Cerrar"
+            style={{
+              width: 28,
+              height: 28,
+              borderRadius: 7,
+              background: "transparent",
+              border: `1px solid ${C.border}`,
+              color: C.textDim,
+              cursor: "pointer",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontSize: 14,
+              lineHeight: 1,
+              flexShrink: 0,
+              transition: `all ${C.dur} ${C.ease}`,
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = C.surfaceL; e.currentTarget.style.color = C.text; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = C.textDim; }}
+          >
+            ×
+          </button>
+        </div>
+
+        <div style={{ padding: 20, maxHeight: "calc(85vh - 140px)", overflowY: "auto" }}>
+          {children}
+        </div>
+
+        {footer && (
+          <div style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            gap: 8,
+            padding: "14px 20px",
+            borderTop: `1px solid ${C.border}`,
+            background: C.bg,
+          }}>
+            {footer}
+          </div>
+        )}
+      </div>
+
+      <style>{`
+        @keyframes auken-backdrop-in {
+          from { opacity: 0; }
+          to { opacity: 1; }
+        }
+        @keyframes auken-modal-in {
+          from { opacity: 0; transform: translateY(8px) scale(0.96); }
+          to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+      `}</style>
+    </div>
+  );
+}
+
 // Skeleton loading — mantiene layout y evita la sensación de "pantalla esperando".
 function Skeleton({ w = "100%", h = 12, r = 4, style = {} }) {
   return (
@@ -1069,21 +1216,27 @@ function CitaModal({ opticaId, pacientes, onClose, refresh }) {
   };
 
   return (
-    <div style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)",
-      backdropFilter: "blur(6px)", display: "flex", alignItems: "center",
-      justifyContent: "center", zIndex: 100, padding: 20,
-    }} onClick={onClose}>
-      <div onClick={e => e.stopPropagation()} style={{
-        background: C.surface, border: `1px solid ${C.border}`,
-        borderRadius: 16, width: 480, maxHeight: "90vh", overflow: "auto",
-      }}>
-        <div style={{ padding: 24, borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-          <h3 style={{ fontSize: 18, fontWeight: 700, color: C.text }}>📅 Nueva Cita Manual</h3>
-          <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.textDim, fontSize: 22, cursor: "pointer" }}>×</button>
-        </div>
-
-        <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 14 }}>
+    <Modal
+      open
+      onClose={onClose}
+      title="Nueva Cita Manual"
+      subtitle="Agenda una cita manual o completa datos desde un paciente existente."
+      icon="📅"
+      size="md"
+      footer={(
+        <>
+          <button onClick={onClose}
+            style={{ background: "transparent", color: C.text, border: `1px solid ${C.border}`, padding: "10px 18px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>
+            Cancelar
+          </button>
+          <button onClick={save} disabled={saving}
+            style={{ background: C.primary, color: "#000", border: "none", padding: "10px 22px", borderRadius: 8, cursor: saving ? "default" : "pointer", fontSize: 13, fontWeight: 700, opacity: saving ? 0.6 : 1 }}>
+            {saving ? "Guardando..." : "📅 Agendar Cita"}
+          </button>
+        </>
+      )}
+    >
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {pacientes.length > 0 && (
             <div>
               <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: C.textDim, textTransform: "uppercase", marginBottom: 6 }}>
@@ -1135,18 +1288,7 @@ function CitaModal({ opticaId, pacientes, onClose, refresh }) {
             style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "inherit", resize: "none" }} />
         </div>
 
-        <div style={{ padding: 24, borderTop: `1px solid ${C.border}`, display: "flex", justifyContent: "flex-end", gap: 10 }}>
-          <button onClick={onClose}
-            style={{ background: "transparent", color: C.text, border: `1px solid ${C.border}`, padding: "10px 18px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>
-            Cancelar
-          </button>
-          <button onClick={save} disabled={saving}
-            style={{ background: C.primary, color: "#000", border: "none", padding: "10px 22px", borderRadius: 8, cursor: saving ? "default" : "pointer", fontSize: 13, fontWeight: 700, opacity: saving ? 0.6 : 1 }}>
-            {saving ? "Guardando..." : "📅 Agendar Cita"}
-          </button>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
@@ -1646,25 +1788,37 @@ function PatientModal({ patient, opticaId, onClose, refresh }) {
   };
 
   return (
-    <div style={{
-      position: "fixed", inset: 0, background: "rgba(0,0,0,0.8)",
-      backdropFilter: "blur(6px)", display: "flex", alignItems: "center",
-      justifyContent: "center", zIndex: 100, padding: 20,
-    }} onClick={onClose}>
-      <div onClick={(e) => e.stopPropagation()} style={{
-        background: C.surface, border: `1px solid ${C.border}`,
-        borderRadius: 16, width: 540, maxHeight: "90vh", overflow: "auto",
-      }}>
-        <div style={{ padding: 24, borderBottom: `1px solid ${C.border}` }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-            <h3 style={{ fontSize: 18, fontWeight: 700, color: C.text }}>
-              {isNew ? "Nuevo Paciente" : `Editar: ${edit.nombre}`}
-            </h3>
-            <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.textDim, fontSize: 22, cursor: "pointer" }}>×</button>
+    <Modal
+      open
+      onClose={onClose}
+      title={isNew ? "Nuevo Paciente" : `Editar: ${edit.nombre}`}
+      subtitle={isNew ? "Crea una ficha clínica y comercial para el monitor." : "Actualiza la ficha clínica, compra y receta del paciente."}
+      icon="👤"
+      size="lg"
+      footer={(
+        <div style={{ width: "100%", display: "flex", justifyContent: "space-between", gap: 12 }}>
+          <div>
+            {!isNew && (
+              <button onClick={remove}
+                style={{ background: "transparent", color: C.red, border: `1px solid ${C.red}40`, padding: "10px 16px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>
+                🗑 Eliminar
+              </button>
+            )}
+          </div>
+          <div style={{ display: "flex", gap: 10 }}>
+            <button onClick={onClose}
+              style={{ background: "transparent", color: C.text, border: `1px solid ${C.border}`, padding: "10px 18px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>
+              Cancelar
+            </button>
+            <button onClick={save}
+              style={{ background: C.primary, color: "#000", border: "none", padding: "10px 22px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700 }}>
+              💾 Guardar
+            </button>
           </div>
         </div>
-
-        <div style={{ padding: 24, display: "flex", flexDirection: "column", gap: 14 }}>
+      )}
+    >
+        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
           {/* OCR */}
           <label style={{
             display: "flex", alignItems: "center", justifyContent: "center", gap: 8,
@@ -1752,28 +1906,7 @@ function PatientModal({ patient, opticaId, onClose, refresh }) {
           )}
         </div>
 
-        <div style={{ padding: 24, borderTop: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", gap: 12 }}>
-          <div>
-            {!isNew && (
-              <button onClick={remove}
-                style={{ background: "transparent", color: C.red, border: `1px solid ${C.red}40`, padding: "10px 16px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>
-                🗑 Eliminar
-              </button>
-            )}
-          </div>
-          <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={onClose}
-              style={{ background: "transparent", color: C.text, border: `1px solid ${C.border}`, padding: "10px 18px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>
-              Cancelar
-            </button>
-            <button onClick={save}
-              style={{ background: C.primary, color: "#000", border: "none", padding: "10px 22px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700 }}>
-              💾 Guardar
-            </button>
-          </div>
-        </div>
-      </div>
-    </div>
+    </Modal>
   );
 }
 
