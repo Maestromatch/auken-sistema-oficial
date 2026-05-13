@@ -4,31 +4,31 @@ export const LABELS = {
     confirmada: { label: "Confirmada", tone: "success", icon: "check" },
     completada: { label: "Completada", tone: "info", icon: "check" },
     cancelada: { label: "Cancelada", tone: "neutral", icon: "x" },
-    no_asistio: { label: "No asistiÃ³", tone: "danger", icon: "warning" },
+    no_asistio: { label: "No asistió", tone: "danger", icon: "warning" },
   },
   citaOrigin: {
     manual: { label: "Manual", tone: "neutral", icon: "edit" },
-    "bot-ia": { label: "AukÃ©n IA", tone: "primary", icon: "bot" },
+    "bot-ia": { label: "Aukén IA", tone: "primary", icon: "bot" },
     wsp: { label: "WhatsApp", tone: "success", icon: "phone" },
     whatsapp: { label: "WhatsApp", tone: "success", icon: "phone" },
   },
   compraState: {
     Pendiente: { label: "Pendiente", tone: "warning", icon: "bolt" },
-    "ComprÃ³": { label: "Cliente", tone: "success", icon: "check" },
-    "No ComprÃ³": { label: "No comprÃ³", tone: "danger", icon: "x" },
+    "Compró": { label: "Cliente", tone: "success", icon: "check" },
+    "No Compró": { label: "No compró", tone: "danger", icon: "x" },
   },
   recetaState: {
     sin_datos: { label: "Sin receta", tone: "neutral", icon: "file" },
     vigente: { label: "Vigente", tone: "success", icon: "check" },
-    proxima: { label: "PrÃ³x. a vencer", tone: "warning", icon: "bolt" },
+    proxima: { label: "Próx. a vencer", tone: "warning", icon: "bolt" },
     vencida: { label: "Vencida", tone: "danger", icon: "warning" },
   },
 };
 
 const DEMO_HINTS = [
   "Placeholder de prueba IA",
-  "El bot deberÃ­a pedirle nombre/RUT",
-  "Datos completados vÃ­a demo IA",
+  "El bot debería pedirle nombre/RUT",
+  "Datos completados vía demo IA",
 ];
 
 export function labelMeta(kind, value, fallbackTone = "neutral") {
@@ -50,18 +50,18 @@ export function formatRut(value) {
 }
 
 export function formatVisit(value) {
-  if (!value) return "AÃºn no visita";
+  if (!value) return "Aún no visita";
   const date = new Date(value);
-  if (Number.isNaN(date.getTime())) return "AÃºn no visita";
+  if (Number.isNaN(date.getTime())) return "Aún no visita";
   return date.toLocaleDateString("es-CL", { day: "2-digit", month: "short", year: "numeric" }).replace(".", "");
 }
 
 export function formatCitaDate(fecha, hora) {
   if (!fecha) return "Fecha por definir";
   const date = new Date(`${fecha}T${hora || "12:00"}:00`);
-  if (Number.isNaN(date.getTime())) return `${fecha}${hora ? ` Â· ${hora}` : ""}`;
+  if (Number.isNaN(date.getTime())) return `${fecha}${hora ? ` / ${hora}` : ""}`;
   const day = date.toLocaleDateString("es-CL", { day: "2-digit", month: "short" }).replace(".", "");
-  return `${day}${hora ? ` Â· ${hora}` : ""}`;
+  return `${day}${hora ? ` / ${hora}` : ""}`;
 }
 
 export function formatCLP(value) {

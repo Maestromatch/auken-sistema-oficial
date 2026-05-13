@@ -8,16 +8,16 @@ import ConfirmDialog from "../components/ConfirmDialog";
 import { formatCitaDate, formatCLP, formatRut, formatVisit, labelMeta, recetaStateFromLastVisit, sanitizeNotas } from "../lib/labels";
 
 // =============================================================
-// AUKÃ‰N OPTICA DASHBOARD â€” versiÃ³n limpia
+// AUKÉN OPTICA DASHBOARD - versión limpia
 // Fixes aplicados:
-//   - Bug TDZ: useEffect movido despuÃ©s de useState
+//   - Bug TDZ: useEffect movido después de useState
 //   - handleSendWhatsApp pasado como prop a OpticaDetail
-//   - Config de Ã³ptica cargada desde Supabase (editable)
+//   - Config de óptica cargada desde Supabase (editable)
 //   - Tabla `citas` integrada (KPI nuevo)
 //   - QueueMonitor integrado para ver salud del sistema
 // =============================================================
 
-// â”€â”€ Design Tokens v2 (Linear.app Ã— Vercel Dashboard) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -- Design Tokens v2 (Linear.app × Vercel Dashboard) ------------
 const C = {
   // surfaces
   bg:          '#08090C',
@@ -32,7 +32,7 @@ const C = {
   // text
   text:        '#EDEEF0',
   textDim:     '#8A8F98',
-  textMuted:   '#5C616C',   // alias â†’ usa textMuted donde estaba en el cÃ³digo anterior
+  textMuted:   '#5C616C',   // alias -> usa textMuted donde estaba en el código anterior
   textMute:    '#5C616C',
   textInv:     '#08090C',
   // brand
@@ -70,9 +70,9 @@ const C = {
   dur:         '160ms',
 };
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -------------------------------------------------------------
 // MICRO COMPONENTES
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -------------------------------------------------------------
 // Helper: genera link "Add to Google Calendar" para una cita
 function buildCalLinkForCita(c, optica) {
   if (!c?.fecha) return null;
@@ -84,9 +84,9 @@ function buildCalLinkForCita(c, optica) {
     const fmt = (d) => d.toISOString().replace(/[-:]|\.\d{3}/g, "");
     const params = new URLSearchParams({
       action: "TEMPLATE",
-      text: `${optica?.nombre || "AukÃ©n"} â€” ${c.servicio || "Cita"}`,
+      text: `${optica?.nombre || "Aukén"} - ${c.servicio || "Cita"}`,
       dates: `${fmt(start)}/${fmt(end)}`,
-      details: `Paciente: ${c.nombre || "â€”"}\nTelÃ©fono: ${c.telefono || "â€”"}\nServicio: ${c.servicio || "â€”"}\nOrigen: ${labelMeta("citaOrigin", c.origen).label}`,
+      details: `Paciente: ${c.nombre || "-"}\nTeléfono: ${c.telefono || "-"}\nServicio: ${c.servicio || "-"}\nOrigen: ${labelMeta("citaOrigin", c.origen).label}`,
       location: `${optica?.direccion || ""}${optica?.ciudad ? ", " + optica.ciudad : ""}`,
     });
     return `https://www.google.com/calendar/render?${params.toString()}`;
@@ -109,7 +109,7 @@ function Card({ children, style = {}, accent }) {
 }
 
 // Genera serie de 7 puntos determinista que termina en `end`.
-// Curva levemente ascendente con oscilaciÃ³n sinusoidal â€” sin random, no parpadea.
+// Curva levemente ascendente con oscilación sinusoidal - sin random, no parpadea.
 function makeSeries(end, n = 7) {
   if (!end || isNaN(Number(end))) return [];
   const v = Number(end);
@@ -119,7 +119,7 @@ function makeSeries(end, n = 7) {
   });
 }
 
-// KPI con delta pill + sparkline SVG â€” reemplaza el KPI anterior
+// KPI con delta pill + sparkline SVG - reemplaza el KPI anterior
 function KpiCard({ label, value, sub, delta, accent = C.text, series = [], glow, icon }) {
   const up = delta >= 0;
   const deltaColor = up ? C.green : C.red;
@@ -165,7 +165,7 @@ function KpiCard({ label, value, sub, delta, accent = C.text, series = [], glow,
             fontFamily: C.fontMono, fontSize: 11, fontWeight: 600,
             fontVariantNumeric: 'tabular-nums',
           }}>
-            <span style={{ fontSize: 8, lineHeight: 1 }}>{up ? 'â–²' : 'â–¼'}</span>
+            <span style={{ fontSize: 8, lineHeight: 1 }}>{up ? '▲' : '▼'}</span>
             {Math.abs(delta)}%
           </span>
         )}
@@ -178,7 +178,7 @@ function KpiCard({ label, value, sub, delta, accent = C.text, series = [], glow,
           fontWeight: 600, letterSpacing: '-0.02em',
           color: accent, fontVariantNumeric: 'tabular-nums',
         }}>
-          {value ?? "â€”"}
+          {value ?? "-"}
         </span>
         {nums.length > 1 && (
           <svg width={W} height={H} style={{ overflow: 'visible', flexShrink: 0 }}>
@@ -201,7 +201,7 @@ function KpiCard({ label, value, sub, delta, accent = C.text, series = [], glow,
   );
 }
 
-// Backward compat â€” algunos lugares del cÃ³digo aÃºn usan <KPI>
+// Backward compat - algunos lugares del código aún usan <KPI>
 function KPI({ label, value, color, sub, glow }) {
   return <KpiCard label={label} value={value} accent={color} sub={sub} glow={glow} series={makeSeries(value)} />;
 }
@@ -312,7 +312,7 @@ function BrandedBarChart({ data = [] }) {
 
 function VentasHero({ total, data }) {
   const [localPeriod, setLocalPeriod] = useState("Anual");
-  const periods = ["Semana", "Mes", "Anual"];
+  const periods = ["Semanal", "Mensual", "Anual"];
   const rotatePeriod = () => {
     const idx = periods.indexOf(localPeriod);
     setLocalPeriod(periods[(idx + 1) % periods.length]);
@@ -514,8 +514,8 @@ function PeriodSelector({ value, onChange }) {
   const options = [
     { id: "today", label: "Hoy" },
     { id: "week", label: "Semana" },
-    { id: "month", label: "Mes" },
-    { id: "year", label: "Año" },
+    { id: "month", label: "Mensual" },
+    { id: "year", label: "Anual" },
   ];
 
   return (
@@ -768,7 +768,7 @@ function Modal({ open = true, onClose, title, subtitle, children, footer, size =
             onMouseEnter={e => { e.currentTarget.style.background = C.surfaceL; e.currentTarget.style.color = C.text; }}
             onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.color = C.textDim; }}
           >
-            Ã—
+            ×
           </button>
         </div>
 
@@ -842,13 +842,13 @@ function SaveStatus({ state, savedAt, error, onRetry }) {
   const map = {
     idle: {
       color: C.textDim,
-      icon: "â—‹",
-      label: savedAt ? `Guardado Â· hace ${seconds}s` : "Sin cambios",
+      icon: "○",
+      label: savedAt ? `Guardado / hace ${seconds}s` : "Sin cambios",
     },
-    saving: { color: C.yellow, icon: "â—", label: "Guardando..." },
-    saved: { color: C.green, icon: "âœ“", label: "Guardado" },
+    saving: { color: C.yellow, icon: "◐", label: "Guardando..." },
+    saved: { color: C.green, icon: "✓", label: "Guardado" },
     error: { color: C.red, icon: "!", label: error || "Error al guardar" },
-  }[state] || { color: C.textDim, icon: "â—‹", label: "Sin cambios" };
+  }[state] || { color: C.textDim, icon: "○", label: "Sin cambios" };
 
   return (
     <div style={{
@@ -920,7 +920,7 @@ function ConfigField({ label, hint, error, success, children }) {
             animation: "auken-fade-in 200ms ease-out",
             flexShrink: 0,
           }}>
-            âœ“ guardado
+            ✓ guardado
           </span>
         )}
       </div>
@@ -1046,13 +1046,13 @@ function CommandPalette({ open, onClose, commands }) {
           padding: "14px 18px",
           borderBottom: `1px solid ${C.border}`,
         }}>
-          <span style={{ color: C.textDim, fontSize: 14 }}>âŒ•</span>
+          <span style={{ color: C.textDim, fontSize: 14 }}>⌕</span>
           <input
             ref={inputRef}
             value={query}
             onChange={e => { setQuery(e.target.value); setActive(0); }}
             onKeyDown={onKeyDown}
-            placeholder="Buscar paciente, cita o acciÃ³n..."
+            placeholder="Buscar paciente, cita o acción..."
             style={{
               flex: 1,
               background: "transparent",
@@ -1179,17 +1179,17 @@ function CommandPalette({ open, onClose, commands }) {
           fontFamily: C.fontMono,
         }}>
           <span style={{ display: "inline-flex", gap: 12 }}>
-            <span>â†‘â†“ navegar</span>
-            <span>â†µ ejecutar</span>
+            <span>↑↓ navegar</span>
+            <span>Enter ejecutar</span>
           </span>
-          <span>AUKÃ‰N Ctrl/âŒ˜K</span>
+          <span>AUKÉN Ctrl/⌘K</span>
         </div>
       </div>
     </div>
   );
 }
 
-// Skeleton loading â€” mantiene layout y evita la sensaciÃ³n de "pantalla esperando".
+// Skeleton loading - mantiene layout y evita la sensación de "pantalla esperando".
 function Skeleton({ w = "100%", h = 12, r = 4, style = {} }) {
   return (
     <div style={{
@@ -1289,16 +1289,16 @@ function DashboardSkeleton() {
   );
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// EMPTY STATE â€” cuadrÃ­cula con nodo pulsante (Linear/Vercel style)
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -------------------------------------------------------------
+// EMPTY STATE - cuadrícula con nodo pulsante (Linear/Vercel style)
+// -------------------------------------------------------------
 function EmptyState({ title, body, cta, onCta, accent = C.primary }) {
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center',
       justifyContent: 'center', padding: '40px 24px', textAlign: 'center', gap: 14,
     }}>
-      {/* IlustraciÃ³n: cuadrÃ­cula 3Ã—3 con nodo central pulsante */}
+      {/* Ilustración: cuadrícula 3×3 con nodo central pulsante */}
       <div style={{
         position: 'relative', width: 64, height: 64,
         display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 6,
@@ -1363,7 +1363,7 @@ function LiveChatBubble({ kind, author, text, time, meta }) {
         }}>
           <span style={{ width: 4, height: 4, borderRadius: "50%", background: C.blue, flexShrink: 0 }} />
           <span style={{ whiteSpace: "pre-wrap" }}>{text}</span>
-          {meta && <span style={{ color: C.textMute }}>Â· {meta}</span>}
+          {meta && <span style={{ color: C.textMute }}>/ {meta}</span>}
         </div>
       </div>
     );
@@ -1402,7 +1402,7 @@ function LiveChatBubble({ kind, author, text, time, meta }) {
       <div style={{ maxWidth: "78%", display: "flex", flexDirection: "column", gap: 3 }}>
         {kind === "bot" && (
           <span style={{ fontSize: 10, color: C.primary, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>
-            AUKÃ‰N IA {meta && <span style={{ color: C.textMute, fontWeight: 500 }}>Â· {meta}</span>}
+            AUKÉN IA {meta && <span style={{ color: C.textMute, fontWeight: 500 }}>/ {meta}</span>}
           </span>
         )}
         {kind === "operator" && (
@@ -1447,9 +1447,9 @@ function Pill({ label, color }) {
   );
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// QUEUE MONITOR (en lÃ­nea)
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -------------------------------------------------------------
+// QUEUE MONITOR (en línea)
+// -------------------------------------------------------------
 const TONE_COLORS = {
   success: { bg: "rgba(52,211,153,0.10)", border: "rgba(52,211,153,0.22)", fg: C.green },
   warning: { bg: "rgba(251,191,36,0.10)", border: "rgba(251,191,36,0.22)", fg: C.yellow },
@@ -1500,7 +1500,7 @@ function Checkbox({ checked, onChange }) {
         transition: `all ${C.dur} ${C.ease}`,
       }}
     >
-      {checked && "âœ“"}
+      {checked && "✓"}
     </button>
   );
 }
@@ -1885,7 +1885,7 @@ function DayTimeline({ date, citas, onSlotClick, onCitaClick }) {
                   <span style={{ fontSize: 12, fontWeight: 700, color: C.text, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{c.nombre || "Paciente"}</span>
                   <span style={{ fontSize: 10, color: color.text, fontFamily: C.fontMono, fontWeight: 700, flexShrink: 0 }}>{c.hora || "--:--"}</span>
                 </div>
-                {height > 32 && <span style={{ fontSize: 11, color: C.textDim, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.servicio || "Cita"} Â· {durationMin}min</span>}
+                {height > 32 && <span style={{ fontSize: 11, color: C.textDim, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{c.servicio || "Cita"} / {durationMin}min</span>}
               </button>
             );
           })}
@@ -2101,9 +2101,9 @@ function QueueMonitor() {
   );
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// TAB: MÃ‰TRICAS
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -------------------------------------------------------------
+// TAB: MÉTRICAS
+// -------------------------------------------------------------
 function TabMetricas({ optica, stats }) {
   const recetasVencidas = stats?.recetas_vencidas || 0;
   const total     = stats?.total_pacientes     || 0;
@@ -2118,7 +2118,7 @@ function TabMetricas({ optica, stats }) {
   // Por ahora se omite el delta (null) y se muestra solo el sparkline.
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
-      {/* Fila 1 â€” recetas */}
+      {/* Fila 1 - recetas */}
       <div className="auken-kpi-grid">
         <KpiCard
           label="Total Pacientes" value={total} accent={C.text}
@@ -2129,12 +2129,12 @@ function TabMetricas({ optica, stats }) {
           sub="receta < 11 meses" series={makeSeries(vigentes)}
         />
         <KpiCard
-          label="PrÃ³x. a vencer" value={proximas} accent={C.yellow}
-          sub="11â€“12 meses" series={makeSeries(proximas)}
+          label="Próx. a vencer" value={proximas} accent={C.yellow}
+          sub="11-12 meses" series={makeSeries(proximas)}
         />
         <KpiCard
           label="Vencidas" value={recetasVencidas} accent={C.red}
-          sub="requieren acciÃ³n" glow={recetasVencidas > 0}
+          sub="requieren acción" glow={recetasVencidas > 0}
           series={makeSeries(recetasVencidas)}
         />
       </div>
@@ -2159,9 +2159,9 @@ function TabMetricas({ optica, stats }) {
   );
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -------------------------------------------------------------
 // TAB: PACIENTES
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -------------------------------------------------------------
 function TabPacientes({ optica, pacientes, refresh, handleSendWhatsApp, onEdit, onCreate }) {
   const { isMobile } = useViewport();
   const [search, setSearch] = useState("");
@@ -2287,8 +2287,8 @@ function TabPacientes({ optica, pacientes, refresh, handleSendWhatsApp, onEdit, 
   );
 }
 
-// TAB: CITAS â€” tabla en desktop, tarjetas en mobile
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// TAB: CITAS - tabla en desktop, tarjetas en mobile
+// -------------------------------------------------------------
 function TabCitas({ citas, refresh, optica, pacientes, onCreateCita }) {
   const { isMobile } = useViewport();
   const [view, setView] = useState("dia");
@@ -2783,7 +2783,7 @@ function TabConfiguracion({ optica, refresh }) {
 }
 
 // MODAL: NUEVO / EDITAR PACIENTE
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -------------------------------------------------------------
 function PatientModal({ patient, opticaId, onClose, refresh }) {
   const isNew = !patient?.id;
   const initialPatient = patient ? { ...patient, notas_clinicas: sanitizeNotas(patient.notas_clinicas) || "" } : null;
@@ -2820,7 +2820,7 @@ function PatientModal({ patient, opticaId, onClose, refresh }) {
   };
 
   const remove = async () => {
-    if (!confirm(`Â¿Eliminar a ${edit.nombre}? Esta acciÃ³n no se puede deshacer.`)) return;
+    if (!confirm(`¿Eliminar a ${edit.nombre}? Esta acción no se puede deshacer.`)) return;
     await supabase.from("pacientes").delete().eq("id", edit.id);
     refresh();
     onClose();
@@ -2854,7 +2854,7 @@ function PatientModal({ patient, opticaId, onClose, refresh }) {
           if (data.success) {
             setEdit(prev => ({ ...prev, receta_data: data.data, receta_img_url: base64Full }));
           } else {
-            alert("No se pudo leer la receta. IntÃ©ntalo con mejor luz o ingresa los datos manualmente.");
+            alert("No se pudo leer la receta. Inténtalo con mejor luz o ingresa los datos manualmente.");
           }
           setScanning(false);
         };
@@ -2872,8 +2872,8 @@ function PatientModal({ patient, opticaId, onClose, refresh }) {
       open
       onClose={onClose}
       title={isNew ? "Nuevo Paciente" : `Editar: ${edit.nombre}`}
-      subtitle={isNew ? "Crea una ficha clÃ­nica y comercial para el monitor." : "Actualiza la ficha clÃ­nica, compra y receta del paciente."}
-      icon="ðŸ‘¤"
+      subtitle={isNew ? "Crea una ficha clínica y comercial para el monitor." : "Actualiza la ficha clínica, compra y receta del paciente."}
+      icon={<Icon name="users" size={16} />}
       size="lg"
       footer={(
         <div style={{ width: "100%", display: "flex", justifyContent: "space-between", gap: 12 }}>
@@ -2892,7 +2892,7 @@ function PatientModal({ patient, opticaId, onClose, refresh }) {
             </button>
             <button onClick={save}
               style={{ background: C.primary, color: "#000", border: "none", padding: "10px 22px", borderRadius: 8, cursor: "pointer", fontSize: 13, fontWeight: 700 }}>
-              ðŸ’¾ Guardar
+              Guardar
             </button>
           </div>
         </div>
@@ -2908,7 +2908,7 @@ function PatientModal({ patient, opticaId, onClose, refresh }) {
             padding: 14, borderRadius: 8, cursor: scanning ? "default" : "pointer",
             fontSize: 13, fontWeight: 600,
           }}>
-            {scanning ? <><Icon name="search" size={13} /> Analizando receta con IA...</> : <><Icon name="camera" size={13} /> Escanear receta con cÃ¡mara/foto</>}
+            {scanning ? <><Icon name="search" size={13} /> Analizando receta con IA...</> : <><Icon name="camera" size={13} /> Escanear receta con cámara/foto</>}
             <input type="file" accept="image/*" style={{ display: "none" }} onChange={scanReceta} disabled={scanning} />
           </label>
 
@@ -2920,7 +2920,7 @@ function PatientModal({ patient, opticaId, onClose, refresh }) {
           </div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
-            <input placeholder="TelÃ©fono (+569...)" value={edit.telefono || ""} onChange={(e) => setEdit({ ...edit, telefono: e.target.value })}
+            <input placeholder="Teléfono (+569...)" value={edit.telefono || ""} onChange={(e) => setEdit({ ...edit, telefono: e.target.value })}
               style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13 }} />
             <input placeholder="Comuna" value={edit.comuna || ""} onChange={(e) => setEdit({ ...edit, comuna: e.target.value })}
               style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13 }} />
@@ -2931,26 +2931,26 @@ function PatientModal({ patient, opticaId, onClose, refresh }) {
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
             <div>
-              <div style={{ fontSize: 10, color: C.textDim, marginBottom: 4, textTransform: "uppercase", fontWeight: 700 }}>Ãšltima Visita</div>
+              <div style={{ fontSize: 10, color: C.textDim, marginBottom: 4, textTransform: "uppercase", fontWeight: 700 }}>Última Visita</div>
               <input type="date" value={edit.fecha_ultima_visita || ""} onChange={(e) => setEdit({ ...edit, fecha_ultima_visita: e.target.value })}
                 style={{ width: "100%", background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13 }} />
             </div>
             <div>
-              <div style={{ fontSize: 10, color: C.textDim, marginBottom: 4, textTransform: "uppercase", fontWeight: 700 }}>PrÃ³ximo Control</div>
+              <div style={{ fontSize: 10, color: C.textDim, marginBottom: 4, textTransform: "uppercase", fontWeight: 700 }}>Próximo Control</div>
               <input type="date" value={edit.fecha_proximo_control || ""} onChange={(e) => setEdit({ ...edit, fecha_proximo_control: e.target.value })}
                 style={{ width: "100%", background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13 }} />
             </div>
           </div>
 
-          <textarea placeholder="Notas clÃ­nicas" rows={3} value={edit.notas_clinicas || ""} onChange={(e) => setEdit({ ...edit, notas_clinicas: e.target.value })}
+          <textarea placeholder="Notas clínicas" rows={3} value={edit.notas_clinicas || ""} onChange={(e) => setEdit({ ...edit, notas_clinicas: e.target.value })}
             style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "inherit", resize: "none" }} />
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
             <select value={edit.estado_compra || "Pendiente"} onChange={(e) => setEdit({ ...edit, estado_compra: e.target.value })}
               style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13 }}>
-              <option>Pendiente</option><option>ComprÃ³</option><option>No ComprÃ³</option>
+              <option>Pendiente</option><option>Compró</option><option>No Compró</option>
             </select>
-            {edit.estado_compra === "ComprÃ³" && (
+            {edit.estado_compra === "Compró" && (
               <input type="number" placeholder="Monto venta $" value={edit.monto_venta || ""} onChange={(e) => setEdit({ ...edit, monto_venta: e.target.value })}
                 style={{ background: C.bg, border: `1px solid ${C.green}50`, color: C.green, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 14, fontWeight: 700 }} />
             )}
@@ -2990,9 +2990,9 @@ function PatientModal({ patient, opticaId, onClose, refresh }) {
   );
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// TAB: EN VIVO â€” Chat + Citas simultÃ¡neos en tiempo real
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+// -------------------------------------------------------------
+// TAB: EN VIVO - Chat + Citas simultáneos en tiempo real
+// -------------------------------------------------------------
 function TabEnVivo({ citas, optica }) {
   const { isMobile } = useViewport();
   const [mensajes, setMensajes]     = useState([]);
@@ -3009,7 +3009,7 @@ function TabEnVivo({ citas, optica }) {
       .limit(60);
 
     if (error) {
-      // Error mÃ¡s comÃºn: tabla no en realtime publication o columna faltante
+      // Error más común: tabla no en realtime publication o columna faltante
       console.error("[TabEnVivo] Error cargando mensajes:", error.message);
       setLoadError(error.message);
       setLoadingMsgs(false);
@@ -3025,11 +3025,11 @@ function TabEnVivo({ citas, optica }) {
   useEffect(() => {
     loadMensajes();
 
-    // Polling cada 8 segundos como fallback si el realtime no funciona aÃºn
-    // (ocurre antes de ejecutar la migraciÃ³n 008 que habilita la publicaciÃ³n)
+    // Polling cada 8 segundos como fallback si el realtime no funciona aún
+    // (ocurre antes de ejecutar la migración 008 que habilita la publicación)
     const pollInterval = setInterval(loadMensajes, 8000);
 
-    // SuscripciÃ³n realtime (requiere migraciÃ³n 008 ejecutada en Supabase)
+    // Suscripción realtime (requiere migración 008 ejecutada en Supabase)
     const sub = supabase.channel("enlive_mensajes_tab_v2")
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "mensajes_chat" }, () => {
         loadMensajes();
@@ -3048,7 +3048,7 @@ function TabEnVivo({ citas, optica }) {
     };
   }, [loadMensajes]);
 
-  // Scroll al Ãºltimo mensaje al cargar
+  // Scroll al último mensaje al cargar
   useEffect(() => {
     if (!loadingMsgs && mensajes.length > 0) {
       setTimeout(() => msgEndRef.current?.scrollIntoView({ behavior: "smooth" }), 150);
@@ -3068,7 +3068,7 @@ function TabEnVivo({ citas, optica }) {
       gap: 16,
       alignItems: "start",
     }}>
-      {/* â”€â”€ Panel izquierdo: Chat en vivo â”€â”€ */}
+      {/* -- Panel izquierdo: Chat en vivo -- */}
       <Card accent={C.primary} style={{ padding: 0 }}>
         <div style={{
           padding: "14px 18px", borderBottom: `1px solid ${C.border}`,
@@ -3092,17 +3092,17 @@ function TabEnVivo({ citas, optica }) {
               onClick={loadMensajes}
               style={{ fontSize: 10, color: C.textDim, background: `${C.border}50`, border: `1px solid ${C.border}`, borderRadius: 5, padding: "3px 8px", cursor: "pointer" }}
             >
-              â†»
+              ↻
             </button>
             <a href="/optica"
               style={{ fontSize: 11, color: C.primary, fontWeight: 700, background: `${C.primary}15`, border: `1px solid ${C.primary}40`, borderRadius: 6, padding: "4px 10px", textDecoration: "none", display: "inline-flex", alignItems: "center" }}
             >
-              Abrir monitor â†’
+              Abrir monitor
             </a>
           </div>
         </div>
 
-        {/* Banner de error si la migraciÃ³n 008 no se ejecutÃ³ */}
+        {/* Banner de error si la migración 008 no se ejecutó */}
         {loadError && (
           <div style={{
             background: `${C.red}15`, borderBottom: `1px solid ${C.red}30`,
@@ -3110,7 +3110,7 @@ function TabEnVivo({ citas, optica }) {
           }}>
             <Icon name="warning" size={13} /> <strong>Error:</strong> {loadError}
             <br />
-            <span style={{ color: C.textDim }}>Ejecuta la migraciÃ³n 008 en Supabase SQL Editor para activar realtime en mensajes_chat.</span>
+            <span style={{ color: C.textDim }}>Ejecuta la migración 008 en Supabase SQL Editor para activar realtime en mensajes_chat.</span>
           </div>
         )}
 
@@ -3139,7 +3139,7 @@ function TabEnVivo({ citas, optica }) {
           {!loadingMsgs && !loadError && mensajes.length === 0 && (
             <EmptyState
               title="Chat en espera"
-              body="Sin mensajes aÃºn. Prueba el bot desde el Monitor o espera a que un paciente escriba por WhatsApp."
+              body="Sin mensajes aún. Prueba el bot desde el Monitor o espera a que un paciente escriba por WhatsApp."
               cta="Abrir Monitor"
               onCta={() => { window.location.href = "/optica"; }}
               accent={C.primary}
@@ -3165,7 +3165,7 @@ function TabEnVivo({ citas, optica }) {
         </div>
       </Card>
 
-      {/* â”€â”€ Panel derecho: Citas prÃ³ximas â”€â”€ */}
+      {/* -- Panel derecho: Citas próximas -- */}
       <Card accent={C.blue} style={{ padding: 0 }}>
         <div style={{
           padding: "14px 18px", borderBottom: `1px solid ${C.border}`,
@@ -3177,10 +3177,10 @@ function TabEnVivo({ citas, optica }) {
               background: C.blue, boxShadow: `0 0 6px ${C.blue}`,
               display: "inline-block",
             }} />
-            <span style={{ fontWeight: 700, fontSize: 14, color: C.text, display: "inline-flex", alignItems: "center", gap: 8 }}><Icon name="calendar" size={14} /> Citas prÃ³ximas</span>
+            <span style={{ fontWeight: 700, fontSize: 14, color: C.text, display: "inline-flex", alignItems: "center", gap: 8 }}><Icon name="calendar" size={14} /> Citas próximas</span>
           </div>
           <span style={{ fontSize: 11, color: C.textDim, fontWeight: 600 }}>
-            {citasProximas.filter(c => c.fecha === today).length} hoy Â· {citasProximas.length} total
+            {citasProximas.filter(c => c.fecha === today).length} hoy / {citasProximas.length} total
           </span>
         </div>
 
@@ -3188,7 +3188,7 @@ function TabEnVivo({ citas, optica }) {
           {citasProximas.length === 0 && (
             <EmptyState
               title="Agenda despejada"
-              body="No hay citas programadas prÃ³ximamente. El bot las agenda automÃ¡ticamente o crÃ©alas desde el tab Citas."
+              body="No hay citas programadas próximamente. El bot las agenda automáticamente o créalas desde el tab Citas."
               accent={C.blue}
             />
           )}
@@ -3214,7 +3214,7 @@ function TabEnVivo({ citas, optica }) {
                       {c.nombre || "Paciente"}
                     </div>
                     <div style={{ fontSize: 11, color: C.textDim, marginTop: 1, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {c.servicio || "â€”"}
+                      {c.servicio || "-"}
                     </div>
                   </div>
                   <div style={{ textAlign: "right", flexShrink: 0 }}>
@@ -3225,7 +3225,7 @@ function TabEnVivo({ citas, optica }) {
                       padding: isToday ? "2px 6px" : "0",
                       borderRadius: 4,
                     }}>
-                      {isToday ? "ðŸ“ HOY" : c.fecha}
+                      {isToday ? "HOY" : c.fecha}
                     </div>
                     {c.hora && (
                       <div style={{ fontSize: 12, color: C.textDim, marginTop: 1, fontWeight: 600 }}>{c.hora}</div>
@@ -3270,7 +3270,7 @@ export default function AukenOpticaDashboard() {
   const navigate = useNavigate();
   const { isMobile, isTablet } = useViewport();
 
-  // âš ï¸ FIX: Todos los useState ANTES de cualquier useEffect
+  // ⚠ FIX: Todos los useState ANTES de cualquier useEffect
   const [tab, setTab] = useState("metricas");
   const [period, setPeriod] = useState("today");
   const [optica, setOptica] = useState(null);
@@ -3285,7 +3285,7 @@ export default function AukenOpticaDashboard() {
   const [citaDraft, setCitaDraft] = useState(null);
   const [commandOpen, setCommandOpen] = useState(false);
 
-  // Slug de la Ã³ptica (en F3 vendrÃ¡ del usuario logueado)
+  // Slug de la óptica (en F3 vendrá del usuario logueado)
   const OPTICA_SLUG = "glowvision";
 
   // Carga inicial + refresh
@@ -3298,8 +3298,8 @@ export default function AukenOpticaDashboard() {
         supabase.from("estadisticas_optica").select("*").eq("slug", OPTICA_SLUG).maybeSingle(),
       ]);
 
-      if (opticaRes.error) throw new Error("No se cargÃ³ la Ã³ptica: " + opticaRes.error.message);
-      if (!opticaRes.data) throw new Error("Ã“ptica no encontrada. Â¿Corriste la migraciÃ³n 002?");
+      if (opticaRes.error) throw new Error("No se cargó la óptica: " + opticaRes.error.message);
+      if (!opticaRes.data) throw new Error("Óptica no encontrada. ¿Corriste la migración 002?");
 
       setOptica(opticaRes.data);
       setPacientes(pacientesRes.data || []);
@@ -3313,7 +3313,7 @@ export default function AukenOpticaDashboard() {
     }
   }, []);
 
-  // âœ… useEffect DESPUÃ‰S de useState (sin TDZ)
+  // ✓ useEffect DESPUÉS de useState (sin TDZ)
   useEffect(() => { refresh(); }, [refresh]);
 
   // Auto-refresh cada 10 segundos como fallback
@@ -3324,6 +3324,7 @@ export default function AukenOpticaDashboard() {
 
   const { toast } = useToaster();
   const initialLoadDone = useRef(false);
+  const patientDeepLinkDone = useRef(false);
 
   // Real-time multi-dispositivo + notificaciones toast
   useEffect(() => {
@@ -3331,16 +3332,16 @@ export default function AukenOpticaDashboard() {
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "pacientes" }, (p) => {
         refresh();
         if (initialLoadDone.current) {
-          toast.success("Paciente registrado", { sub: p.new.nombre || "Nuevo paciente aÃ±adido" });
+          toast.success("Paciente registrado", { sub: p.new.nombre || "Nuevo paciente añadido" });
         }
       })
       .on("postgres_changes", { event: "INSERT", schema: "public", table: "citas" }, (p) => {
         refresh();
         if (initialLoadDone.current) {
           const isBot = p.new.origen === "bot-ia";
-          const fechaFmt = `${p.new.fecha || ""}${p.new.hora ? " Â· " + p.new.hora : ""}`;
-          toast.cita(isBot ? "IA agendÃ³ una cita" : "Nueva cita agendada", {
-            sub: `${p.new.nombre || "Paciente"} â€” ${p.new.servicio || "servicio"} â€” ${fechaFmt}`,
+          const fechaFmt = `${p.new.fecha || ""}${p.new.hora ? " / " + p.new.hora : ""}`;
+          toast.cita(isBot ? "IA agendó una cita" : "Nueva cita agendada", {
+            sub: `${p.new.nombre || "Paciente"} - ${p.new.servicio || "servicio"} - ${fechaFmt}`,
             duration: 8000,
           });
         }
@@ -3353,10 +3354,22 @@ export default function AukenOpticaDashboard() {
     return () => supabase.removeChannel(sub);
   }, [refresh, toast]);
 
-  // Title dinÃ¡mico (tambiÃ©n despuÃ©s de useState)
+  // Title dinámico (también después de useState)
   useEffect(() => {
-    if (optica) document.title = `${optica.nombre} | AukÃ©n`;
+    if (optica) document.title = `${optica.nombre} | Aukén`;
   }, [optica?.nombre]);
+
+  useEffect(() => {
+    if (patientDeepLinkDone.current || loading || !pacientes.length) return;
+    const id = new URLSearchParams(window.location.search).get("patient");
+    if (!id) return;
+    const patient = pacientes.find(p => String(p.id) === String(id));
+    if (!patient) return;
+    patientDeepLinkDone.current = true;
+    setEditingPatient(patient);
+    setShowPatientModal(true);
+    setTab("pacientes");
+  }, [loading, pacientes]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -3392,16 +3405,16 @@ export default function AukenOpticaDashboard() {
       {
         label: "Navegar",
         items: [
-          { id: "metrics", icon: <Icon name="metrics" size={13} />, label: "Ir a MÃ©tricas", shortcut: "G M", run: () => setTab("metricas") },
+          { id: "metrics", icon: <Icon name="metrics" size={13} />, label: "Ir a Métricas", shortcut: "G M", run: () => setTab("metricas") },
           { id: "live", icon: <Icon name="chat" size={13} />, label: "En Vivo", shortcut: "G V", run: () => setTab("enlive") },
           { id: "patients", icon: <Icon name="users" size={13} />, label: "Pacientes", subtitle: `${pacientes.length}`, shortcut: "G P", run: () => setTab("pacientes") },
           { id: "citas", icon: <Icon name="calendar" size={13} />, label: "Citas", subtitle: pendingCitas ? `${pendingCitas} pendientes` : `${citas.length}`, shortcut: "G C", run: () => setTab("citas") },
-          { id: "config", icon: <Icon name="settings" size={13} />, label: "ConfiguraciÃ³n", shortcut: "G S", run: () => setTab("config") },
+          { id: "config", icon: <Icon name="settings" size={13} />, label: "Configuración", shortcut: "G S", run: () => setTab("config") },
           { id: "monitor", icon: <Icon name="chat" size={13} />, label: "Abrir monitor de chat", shortcut: "G O", run: () => navigate("/optica") },
         ],
       },
       {
-        label: "Acciones rÃ¡pidas",
+        label: "Acciones rápidas",
         items: [
           { id: "new-patient", icon: "+", label: "Nuevo paciente", shortcut: "N P", run: openNewPatient },
           { id: "new-cita", icon: "+", label: "Nueva cita", shortcut: "N C", run: () => openCitaModal() },
@@ -3422,38 +3435,38 @@ export default function AukenOpticaDashboard() {
     ];
   }, [citas, navigate, openCitaModal, openEditPatient, openNewPatient, pacientes]);
 
-  // AcciÃ³n WhatsApp â€” normaliza nÃºmero chileno y abre wa.me
+  // Acción WhatsApp - normaliza número chileno y abre wa.me
   // NO es async porque window.open necesita estar en el contexto directo del evento
   const handleSendWhatsApp = useCallback((paciente) => {
     if (!paciente?.telefono) {
-      alert("Este paciente no tiene telÃ©fono registrado.");
+      alert("Este paciente no tiene teléfono registrado.");
       return;
     }
 
-    // Normalizar nÃºmero: quitar todo lo que no sea dÃ­gito
+    // Normalizar número: quitar todo lo que no sea dígito
     let phone = paciente.telefono.replace(/\D/g, "");
-    // Si empieza con 0, quitarlo (ej: 09xxxxxxxx â†’ 9xxxxxxxx)
+    // Si empieza con 0, quitarlo (ej: 09xxxxxxxx -> 9xxxxxxxx)
     if (phone.startsWith("0")) phone = phone.slice(1);
-    // Si tiene 8 o 9 dÃ­gitos sin prefijo de paÃ­s, asumir Chile (+56)
+    // Si tiene 8 o 9 dígitos sin prefijo de país, asumir Chile (+56)
     if (phone.length <= 9 && !phone.startsWith("56")) phone = "56" + phone;
-    // Si empieza con 569... ya estÃ¡ correcto; si empieza con 56 + 8 dÃ­gitos tambiÃ©n.
+    // Si empieza con 569... ya está correcto; si empieza con 56 + 8 dígitos también.
 
     const nombre = (paciente.nombre || "Estimado").split(" ")[0];
     const msg = encodeURIComponent(
-      `Hola ${nombre} ðŸ‘‹, te escribimos de ${optica?.nombre || "la Ã³ptica"}. Â¿En quÃ© te podemos ayudar?`
+      `Hola ${nombre} , te escribimos de ${optica?.nombre || "la óptica"}. ¿En qué te podemos ayudar?`
     );
 
-    // window.open con rel noopener â€” mÃ¡s confiable que location.href en desktop
+    // window.open con rel noopener - más confiable que location.href en desktop
     // En mobile iOS/Android abre la app de WhatsApp directamente
     const waUrl = `https://wa.me/${phone}?text=${msg}`;
     const win = window.open(waUrl, "_blank", "noopener,noreferrer");
-    // Fallback por si el popup blocker lo bloqueÃ³
+    // Fallback por si el popup blocker lo bloqueó
     if (!win) window.location.href = waUrl;
   }, [optica]);
 
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -------------------------------------------------------------
   // RENDER
-  // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+  // -------------------------------------------------------------
   if (loading) {
     return <DashboardSkeleton />;
   }
@@ -3465,7 +3478,7 @@ export default function AukenOpticaDashboard() {
           <h3 style={{ color: C.red, fontSize: 18, marginBottom: 12, display: "inline-flex", alignItems: "center", gap: 8 }}><Icon name="warning" size={18} /> Error al cargar el dashboard</h3>
           <p style={{ color: C.text, fontSize: 14, marginBottom: 16, lineHeight: 1.6 }}>{error}</p>
           <p style={{ color: C.textDim, fontSize: 13, lineHeight: 1.6, marginBottom: 16 }}>
-            Causa mÃ¡s probable: la migraciÃ³n SQL no se ejecutÃ³. Revisa que en Supabase existan las tablas <code style={{ color: C.primary }}>opticas</code>, <code style={{ color: C.primary }}>citas</code>, <code style={{ color: C.primary }}>conversaciones</code> y <code style={{ color: C.primary }}>message_queue</code>.
+            Causa más probable: la migración SQL no se ejecutó. Revisa que en Supabase existan las tablas <code style={{ color: C.primary }}>opticas</code>, <code style={{ color: C.primary }}>citas</code>, <code style={{ color: C.primary }}>conversaciones</code> y <code style={{ color: C.primary }}>message_queue</code>.
           </p>
           <button onClick={() => window.location.reload()}
             style={{ background: C.primary, color: "#000", border: "none", padding: "10px 18px", borderRadius: 6, cursor: "pointer", fontWeight: 700 }}>
@@ -3500,19 +3513,19 @@ export default function AukenOpticaDashboard() {
       }}>
         <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
           <div style={{ width: isMobile ? 28 : 32, height: isMobile ? 28 : 32, background: `linear-gradient(135deg, ${C.primary}, ${C.blue})`, borderRadius: C.radius, display: "flex", alignItems: "center", justifyContent: "center", color: C.bg, flexShrink: 0, boxShadow: `0 0 12px ${C.primarySoft}` }}><Icon name="eye" size={isMobile ? 14 : 16} strokeWidth={1.8} /></div>
-          <span style={{ fontFamily: C.fontSans, fontWeight: 700, fontSize: isMobile ? 14 : 17, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", letterSpacing: '-0.02em' }}>{optica?.nombre || "AUKÃ‰N"}</span>
+          <span style={{ fontFamily: C.fontSans, fontWeight: 700, fontSize: isMobile ? 14 : 17, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis", letterSpacing: '-0.02em' }}>{optica?.nombre || "AUKÉN"}</span>
           {!isMobile && (
             <>
-              <span style={{ color: C.textMuted, margin: "0 4px" }}>Â·</span>
+              <span style={{ color: C.textMuted, margin: "0 4px" }}>/</span>
               <span style={{ fontSize: 12, color: C.textDim }}>Dashboard</span>
             </>
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: isMobile ? 6 : 12, flexShrink: 0 }}>
           <button className="auken-touch" onClick={() => setCommandOpen(true)}
-            title="Abrir comandos (Ctrl/âŒ˜K)"
+            title="Abrir comandos (Ctrl/⌘K)"
             style={{ background: C.surfaceL, border: `1px solid ${C.border}`, color: C.textDim, borderRadius: C.radius, padding: isMobile ? "5px 8px" : "5px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: C.fontMono, letterSpacing: 0 }}>
-            {isMobile ? "âŒ˜K" : "Ctrl/âŒ˜K"}
+            {isMobile ? "⌘K" : "Ctrl/⌘K"}
           </button>
           <button className="auken-touch" onClick={() => navigate("/optica")}
             title="Ir al monitor de conversaciones"
@@ -3527,7 +3540,7 @@ export default function AukenOpticaDashboard() {
           )}
           <button className="auken-touch" onClick={() => { localStorage.removeItem("auken_auth"); navigate("/login"); }}
             style={{ background: "transparent", border: `1px solid ${C.border}`, color: C.textDim, borderRadius: C.radius, padding: isMobile ? "5px 10px" : "5px 12px", fontSize: 12, fontWeight: 500, cursor: "pointer", whiteSpace: "nowrap", letterSpacing: '-0.01em' }}>
-            {isMobile ? "Salir" : "Cerrar sesiÃ³n"}
+            {isMobile ? "Salir" : "Cerrar sesión"}
           </button>
         </div>
       </nav>
@@ -3544,11 +3557,11 @@ export default function AukenOpticaDashboard() {
         />
 
         <div className="auken-tabs">
-          <DashboardTab active={tab === "metricas"} icon={<Icon name="metrics" size={14} />} label="MÃ©tricas" onClick={() => setTab("metricas")} />
+          <DashboardTab active={tab === "metricas"} icon={<Icon name="metrics" size={14} />} label="Métricas" onClick={() => setTab("metricas")} />
           <DashboardTab active={tab === "enlive"} icon={<Icon name="chat" size={14} />} label="En Vivo" onClick={() => setTab("enlive")} />
           <DashboardTab active={tab === "pacientes"} icon={<Icon name="users" size={14} />} label="Pacientes" count={pacientes.length} onClick={() => setTab("pacientes")} />
           <DashboardTab active={tab === "citas"} icon={<Icon name="calendar" size={14} />} label="Citas" count={citas.filter(c => c.estado === "pendiente_confirmacion").length} onClick={() => setTab("citas")} />
-          <DashboardTab active={tab === "config"} icon={<Icon name="settings" size={14} />} label="ConfiguraciÃ³n" onClick={() => setTab("config")} />
+          <DashboardTab active={tab === "config"} icon={<Icon name="settings" size={14} />} label="Configuración" onClick={() => setTab("config")} />
         </div>
 
         {tab === "metricas" && <TabMetricas optica={optica} stats={stats} />}
