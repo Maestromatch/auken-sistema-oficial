@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+import ConfirmDialog from "../components/ConfirmDialog";
 
 // ── PALETA ZEN / WAR ROOM ──────────────────────────────────────────────
 const Z = {
@@ -71,6 +72,9 @@ export default function AukenAdmin() {
   const [pass, setPass] = useState("");
   const [opticas, setOpticas] = useState([]);
   const [showAdd, setShowAdd] = useState(false);
+  const [advancedOpen, setAdvancedOpen] = useState(false);
+  const [purgeOpen, setPurgeOpen] = useState(false);
+  const [suspending, setSuspending] = useState(null);
   const [loading, setLoading] = useState(true);
   const [newOptica, setNewOptica] = useState({ 
     nombre: "", dueño: "", plan: "Mensual", telefono: "", ciudad: "", 
@@ -102,6 +106,31 @@ export default function AukenAdmin() {
     const next = currentStatus === "active" ? "suspended" : "active";
     const { error } = await supabase.from("saas_clients").update({ status: next }).eq("id", id);
     if (!error) fetchClients();
+  };
+
+  const requestStatusChange = (optica) => {
+    if (optica.status === "active") {
+      setSuspending(optica);
+      return;
+    }
+    toggleStatus(optica.id, optica.status);
+  };
+
+  const confirmSuspend = async () => {
+    if (!suspending) return;
+    await toggleStatus(suspending.id, suspending.status);
+    setSuspending(null);
+  };
+
+  const purgeDemoData = async () => {
+    await Promise.all([
+      supabase.from("conversaciones").delete().neq("id", 0),
+      supabase.from("citas").delete().neq("id", 0),
+      supabase.from("pacientes").delete().neq("id", 0),
+    ]);
+    setPurgeOpen(false);
+    fetchClients();
+    alert("Datos operativos purgados.");
   };
 
   const addOptica = async (e) => {
@@ -168,15 +197,19 @@ export default function AukenAdmin() {
           </div>
           <p style={{ color: Z.inkFaint, fontSize: 12, fontFamily: "'IBM Plex Mono', monospace" }}>MONITOR DEL ECOSISTEMA v6.0</p>
         </div>
-        <div style={{ display: "flex", gap: 12 }}>
-          <button onClick={async () => {
-            if (confirm("🚨 ¿BORRAR TODOS LOS DATOS DE PRUEBA?")) {
-              const { error } = await supabase.from("pacientes").delete().neq("id", 0);
-              if (!error) alert("SISTEMA PURGADO.");
-            }
-          }} style={{ background: "transparent", color: Z.red, border: `1px solid ${Z.red}40`, borderRadius: 12, padding: "10px 20px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
-            PURGAR DATOS
+        <div style={{ display: "flex", gap: 12, alignItems: "center", position: "relative" }}>
+          <button onClick={() => setAdvancedOpen(v => !v)}
+            style={{ background: "transparent", border: `1px solid ${Z.border}`, color: Z.inkMid, borderRadius: 12, padding: "10px 16px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
+            AVANZADO
           </button>
+          {advancedOpen && (
+            <div style={{ position: "absolute", right: 92, top: 44, width: 220, background: Z.surface, border: `1px solid ${Z.border}`, borderRadius: 12, padding: 6, boxShadow: "0 18px 48px rgba(0,0,0,0.55)", zIndex: 10 }}>
+              <button onClick={() => { setAdvancedOpen(false); setPurgeOpen(true); }}
+                style={{ width: "100%", textAlign: "left", background: "transparent", color: Z.red, border: "none", borderRadius: 8, padding: "10px 12px", fontSize: 11, fontWeight: 800, cursor: "pointer" }}>
+                PURGAR DATOS OPERATIVOS
+              </button>
+            </div>
+          )}
           <button onClick={() => { localStorage.removeItem("auken_admin"); setAuthed(false); }}
             style={{ background: Z.surfaceL, border: `1px solid ${Z.border}`, color: Z.inkMid, borderRadius: 12, padding: "10px 20px", fontSize: 11, fontWeight: 700, cursor: "pointer" }}>
             SALIR
@@ -228,7 +261,7 @@ export default function AukenAdmin() {
                   </div>
                 </td>
                 <td style={{ padding: "16px 24px" }}>
-                  <button onClick={() => toggleStatus(o.id, o.status)} style={{
+                  <button onClick={() => requestStatusChange(o)} style={{
                     background: "transparent", border: `1px solid ${o.status === "active" ? Z.red : Z.green}40`,
                     color: o.status === "active" ? Z.red : Z.green, borderRadius: 8, padding: "6px 12px", fontSize: 10, fontWeight: 700, cursor: "pointer"
                   }}>
@@ -269,6 +302,40 @@ export default function AukenAdmin() {
           </Card>
         </div>
       )}
+
+      <ConfirmDialog
+        open={purgeOpen}
+        onClose={() => setPurgeOpen(false)}
+        onConfirm={purgeDemoData}
+        severity="critical"
+        title="Purgar datos operativos"
+        body="Esto eliminará pacientes, citas y conversaciones de forma permanente. No elimina partners ni configuraciones comerciales. La operación no es reversible."
+        action={[
+          { label: "Pacientes", value: "se borrarán todos" },
+          { label: "Citas", value: "se borrarán todas" },
+          { label: "Conversaciones", value: "se borrarán todas" },
+          { label: "Partners", value: "se conservan" },
+        ]}
+        typeToConfirm="PURGAR ECOSISTEMA"
+        confirmText="Purgar definitivamente"
+        theme={{ bg: Z.bgDeep, surface: Z.surface, surfaceL: Z.surfaceL, border: Z.border, text: Z.ink, textDim: Z.inkMid, textMute: Z.inkFaint, textInv: Z.bgDeep, yellow: Z.amber, red: Z.red, fontSans: "'Inter', sans-serif", fontMono: "'IBM Plex Mono', monospace" }}
+      />
+
+      <ConfirmDialog
+        open={!!suspending}
+        onClose={() => setSuspending(null)}
+        onConfirm={confirmSuspend}
+        severity="danger"
+        title={`Suspender ${suspending?.optica_name || "partner"}`}
+        body="El bot dejará de responder para esta óptica y el acceso quedará pausado hasta que la reactives."
+        action={[
+          { label: "Partner", value: suspending?.optica_name || "-" },
+          { label: "MRR pausado", value: "$" + Number(suspending?.config?.mensualidad || 0).toLocaleString("es-CL"), mono: true },
+        ]}
+        typeToConfirm={suspending?.optica_name || ""}
+        confirmText="Suspender"
+        theme={{ bg: Z.bgDeep, surface: Z.surface, surfaceL: Z.surfaceL, border: Z.border, text: Z.ink, textDim: Z.inkMid, textMute: Z.inkFaint, textInv: Z.bgDeep, yellow: Z.amber, red: Z.red, fontSans: "'Inter', sans-serif", fontMono: "'IBM Plex Mono', monospace" }}
+      />
     </div>
   );
 }

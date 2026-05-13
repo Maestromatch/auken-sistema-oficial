@@ -4,6 +4,7 @@ import { supabase } from "../lib/supabase";
 import { useToaster } from "../components/Toaster";
 import { useViewport } from "../lib/useViewport";
 import Icon from "../components/Icon";
+import ConfirmDialog from "../components/ConfirmDialog";
 import { formatCitaDate, formatCLP, formatRut, formatVisit, labelMeta, recetaStateFromLastVisit, sanitizeNotas } from "../lib/labels";
 
 // =============================================================
@@ -2120,9 +2121,26 @@ function TabCitas({ citas, refresh, optica, pacientes, onCreateCita }) {
   const { isMobile } = useViewport();
   const [view, setView] = useState("dia");
   const [selectedDate, setSelectedDate] = useState(() => dateFromISO(new Date().toISOString().split("T")[0]));
+  const [cancelRequest, setCancelRequest] = useState(null);
 
   const updateCita = async (id, estado) => {
     await supabase.from("citas").update({ estado }).eq("id", id);
+    refresh();
+  };
+
+  const requestCancelCita = (target) => {
+    const ids = Array.isArray(target) ? target : [target.id];
+    const selected = citas.filter(c => ids.includes(c.id));
+    const label = selected.length === 1
+      ? selected[0].nombre || `Cita #${selected[0].id}`
+      : `${ids.length} citas seleccionadas`;
+    setCancelRequest({ ids, label, count: ids.length });
+  };
+
+  const confirmCancelCita = async () => {
+    if (!cancelRequest?.ids?.length) return;
+    await supabase.from("citas").update({ estado: "cancelada" }).in("id", cancelRequest.ids);
+    setCancelRequest(null);
     refresh();
   };
 
@@ -2228,7 +2246,7 @@ function TabCitas({ citas, refresh, optica, pacientes, onCreateCita }) {
                       </button>
                     )}
                     {c.estado !== "cancelada" && (
-                      <button onClick={() => updateCita(c.id, "cancelada")}
+                      <button onClick={() => requestCancelCita(c)}
                         style={{ background: `${C.red}15`, color: C.red, border: `1px solid ${C.red}30`, padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11 }}>
                         Cancelar
                       </button>
@@ -2321,12 +2339,12 @@ function TabCitas({ citas, refresh, optica, pacientes, onCreateCita }) {
               return [
                 ...(calLink ? [{ icon: <Icon name="calendar" size={14} />, label: "Agregar a Google Calendar", color: "#7DD3FC", run: () => window.open(calLink, "_blank", "noopener,noreferrer") }] : []),
                 ...(c.estado === "pendiente_confirmacion" ? [{ icon: <Icon name="check" size={14} />, label: "Confirmar", color: C.green, run: () => updateCita(c.id, "confirmada") }] : []),
-                ...(c.estado !== "cancelada" ? [{ icon: <Icon name="x" size={14} />, label: "Cancelar", color: C.red, run: () => updateCita(c.id, "cancelada") }] : []),
+                ...(c.estado !== "cancelada" ? [{ icon: <Icon name="x" size={14} />, label: "Cancelar", color: C.red, run: () => requestCancelCita(c) }] : []),
               ];
             }}
             bulkActions={[
               { label: "Confirmar", run: ids => ids.forEach(id => updateCita(id, "confirmada")) },
-              { label: "Cancelar", run: ids => ids.forEach(id => updateCita(id, "cancelada")) },
+              { label: "Cancelar", run: requestCancelCita },
             ]}
           />
           )}
@@ -2389,7 +2407,7 @@ function TabCitas({ citas, refresh, optica, pacientes, onCreateCita }) {
                             </button>
                           )}
                           {c.estado !== "cancelada" && (
-                            <button onClick={() => updateCita(c.id, "cancelada")}
+                            <button onClick={() => requestCancelCita(c)}
                               style={{ background: `${C.red}20`, color: C.red, border: `1px solid ${C.red}40`, padding: "5px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11 }}>
                               Cancelar
                             </button>
@@ -2405,6 +2423,21 @@ function TabCitas({ citas, refresh, optica, pacientes, onCreateCita }) {
           </>
         )}
       </Card>
+
+      <ConfirmDialog
+        open={!!cancelRequest}
+        onClose={() => setCancelRequest(null)}
+        onConfirm={confirmCancelCita}
+        severity="caution"
+        title={cancelRequest?.count === 1 ? "Cancelar cita" : "Cancelar citas"}
+        body="La cita quedara marcada como cancelada y dejara de aparecer como una atencion activa. Esta accion se puede corregir volviendo a confirmar la cita."
+        action={[
+          { label: "Seleccion", value: cancelRequest?.label || "-" },
+          { label: "Cantidad", value: String(cancelRequest?.count || 0), mono: true },
+        ]}
+        confirmText="Cancelar cita"
+        theme={C}
+      />
     </>
   );
 }
