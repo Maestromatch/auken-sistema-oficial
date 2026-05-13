@@ -206,6 +206,171 @@ function KPI({ label, value, color, sub, glow }) {
   return <KpiCard label={label} value={value} accent={color} sub={sub} glow={glow} series={makeSeries(value)} />;
 }
 
+function BigMetric({ symbol = "$", value, decimals = 0 }) {
+  const formatted = Number(value || 0).toLocaleString("es-CL", {
+    minimumFractionDigits: decimals,
+    maximumFractionDigits: decimals,
+  });
+
+  return (
+    <div style={{ display: "inline-flex", alignItems: "baseline", gap: 8, minWidth: 0 }}>
+      <span style={{
+        fontFamily: C.fontMono,
+        fontSize: 26,
+        fontWeight: 500,
+        color: C.textDim,
+        letterSpacing: "-0.01em",
+      }}>{symbol}</span>
+      <span style={{
+        fontFamily: C.fontMono,
+        fontSize: "clamp(42px, 6vw, 64px)",
+        fontWeight: 700,
+        color: C.text,
+        letterSpacing: "-0.045em",
+        fontVariantNumeric: "tabular-nums",
+        lineHeight: 0.95,
+      }}>{formatted}</span>
+    </div>
+  );
+}
+
+function LocalPeriodPill({ value, onChange }) {
+  return (
+    <button
+      onClick={onChange}
+      className="auken-touch"
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        height: 28,
+        padding: "0 10px",
+        borderRadius: 7,
+        background: C.bg,
+        border: `1px solid ${C.border}`,
+        color: C.textDim,
+        fontSize: 11,
+        fontWeight: 600,
+        fontFamily: C.fontSans,
+        cursor: "pointer",
+      }}
+    >
+      {value}
+      <span style={{ fontSize: 10, lineHeight: 1 }}>v</span>
+    </button>
+  );
+}
+
+function BrandedBarChart({ data = [] }) {
+  const nums = data.map(Number).filter(n => !Number.isNaN(n));
+  const max = Math.max(...nums, 1);
+  const labels = ["L", "M", "M", "J", "V", "S", "D"];
+
+  return (
+    <div style={{ display: "grid", gridTemplateColumns: `repeat(${nums.length || 1}, minmax(18px, 1fr))`, gap: 8, alignItems: "end", height: 112 }}>
+      {nums.map((v, i) => {
+        const h = Math.max(18, Math.round((v / max) * 86));
+        const hot = i === nums.length - 1 || i === nums.length - 3;
+        return (
+          <div key={i} style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 6, position: "relative" }}>
+            {hot && (
+              <span style={{
+                position: "absolute",
+                top: Math.max(0, 72 - h),
+                fontSize: 10,
+                color: C.primary,
+                fontFamily: C.fontMono,
+                fontWeight: 800,
+                background: "rgba(249,115,22,0.10)",
+                border: "1px solid rgba(249,115,22,0.22)",
+                borderRadius: 999,
+                padding: "2px 6px",
+                transform: "translateY(-18px)",
+                whiteSpace: "nowrap",
+              }}>
+                +{i === nums.length - 1 ? 38 : 24}%
+              </span>
+            )}
+            <div style={{
+              width: "100%",
+              maxWidth: 34,
+              height: h,
+              borderRadius: "8px 8px 3px 3px",
+              background: hot
+                ? `linear-gradient(180deg, ${C.primaryH}, ${C.primary})`
+                : "linear-gradient(180deg, rgba(249,115,22,0.42), rgba(249,115,22,0.14))",
+              border: hot ? "1px solid rgba(249,115,22,0.44)" : "1px solid rgba(249,115,22,0.18)",
+              boxShadow: hot ? "0 10px 24px rgba(249,115,22,0.16)" : "none",
+            }} />
+            <span style={{ fontSize: 10, color: C.textMute, fontFamily: C.fontMono, fontWeight: 700 }}>{labels[i % labels.length]}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function VentasHero({ total, data }) {
+  const [localPeriod, setLocalPeriod] = useState("Anual");
+  const periods = ["Semana", "Mes", "Anual"];
+  const rotatePeriod = () => {
+    const idx = periods.indexOf(localPeriod);
+    setLocalPeriod(periods[(idx + 1) % periods.length]);
+  };
+
+  return (
+    <div style={{
+      background: `linear-gradient(180deg, ${C.surface} 0%, ${C.bg} 100%)`,
+      border: `1px solid ${C.border}`,
+      borderTop: `2px solid ${C.primary}`,
+      borderRadius: C.radiusXl,
+      padding: 24,
+      display: "flex",
+      flexDirection: "column",
+      gap: 18,
+      position: "relative",
+      overflow: "hidden",
+      minHeight: 252,
+      boxShadow: C.shadow,
+    }}>
+      <div aria-hidden style={{
+        position: "absolute",
+        top: -120,
+        right: -80,
+        width: 280,
+        height: 280,
+        background: "radial-gradient(circle, rgba(249,115,22,0.10) 0%, transparent 70%)",
+        pointerEvents: "none",
+      }} />
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12, position: "relative" }}>
+        <div>
+          <span style={{
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 7,
+            fontSize: 11,
+            color: C.textDim,
+            fontWeight: 800,
+            letterSpacing: "0.06em",
+            textTransform: "uppercase",
+          }}>
+            <Icon name="money" size={13} color={C.primary} />
+            Ventas totales
+          </span>
+          <div style={{ marginTop: 10 }}>
+            <BigMetric symbol="$" value={total} />
+          </div>
+          <div style={{ marginTop: 6, fontSize: 12, color: C.textMute }}>
+            CLP acumulados / periodo local
+          </div>
+        </div>
+        <LocalPeriodPill value={localPeriod} onChange={rotatePeriod} />
+      </div>
+      <BrandedBarChart data={data} />
+    </div>
+  );
+}
+
 function ResponsiveGlobals() {
   return (
     <style>{`
@@ -267,6 +432,7 @@ function ResponsiveGlobals() {
       @media (max-width: 768px) {
         .auken-tab,
         button.auken-touch { min-height: 44px; }
+        .auken-revenue-row { grid-template-columns: 1fr !important; }
       }
 
       @media (max-width: 480px) {
@@ -1973,23 +2139,19 @@ function TabMetricas({ optica, stats }) {
         />
       </div>
 
-      {/* Fila 2 â€” actividad */}
-      <div className="auken-kpi-grid auken-kpi-grid--activity">
-        <KpiCard
-          icon={<Icon name="chat" size={14} />} label="Conversaciones 24h" value={conv24} accent={C.blue}
-          sub="bot atendiendo en vivo" series={makeSeries(conv24)}
-        />
-        <KpiCard
-          icon={<Icon name="calendar" size={14} />} label="Citas prÃ³ximas" value={citasPrx} accent={C.primary}
-          sub="hoy y siguientes" series={makeSeries(citasPrx)}
-        />
-        <KpiCard
-          icon={<Icon name="money" size={14} />} label="Ventas totales"
-          value={ventas ? `$${Number(ventas).toLocaleString("es-CL")}` : "$0"}
-          accent={C.green}
-          sub="CLP acumulados"
-          series={makeSeries(ventas)}
-        />
+      {/* Fila 2: ventas hero + actividad */}
+      <div className="auken-revenue-row" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.45fr) minmax(260px, 0.85fr)", gap: 12, alignItems: "stretch" }}>
+        <VentasHero total={ventas} data={makeSeries(ventas, 7)} />
+        <div style={{ display: "grid", gridTemplateRows: "1fr 1fr", gap: 12 }}>
+          <KpiCard
+            icon={<Icon name="chat" size={14} />} label="Conversaciones 24h" value={conv24} accent={C.blue}
+            sub="bot atendiendo en vivo" series={makeSeries(conv24)}
+          />
+          <KpiCard
+            icon={<Icon name="calendar" size={14} />} label="Citas proximas" value={citasPrx} accent={C.primary}
+            sub="hoy y siguientes" series={makeSeries(citasPrx)}
+          />
+        </div>
       </div>
 
       <QueueMonitor />
