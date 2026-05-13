@@ -344,6 +344,153 @@ function DashboardTab({ active, icon, label, count, onClick }) {
   );
 }
 
+function PeriodSelector({ value, onChange }) {
+  const options = [
+    { id: "today", label: "Hoy" },
+    { id: "week", label: "Semana" },
+    { id: "month", label: "Mes" },
+    { id: "year", label: "Año" },
+  ];
+
+  return (
+    <div style={{
+      display: "inline-flex",
+      padding: 3,
+      background: C.surface,
+      border: `1px solid ${C.border}`,
+      borderRadius: 10,
+      gap: 2,
+      boxShadow: C.shadowSm,
+    }}>
+      {options.map(o => {
+        const active = value === o.id;
+        return (
+          <button
+            key={o.id}
+            onClick={() => onChange(o.id)}
+            className="auken-touch"
+            style={{
+              height: 30,
+              padding: "0 12px",
+              borderRadius: 7,
+              background: active ? C.surfaceL : "transparent",
+              color: active ? C.text : C.textDim,
+              border: active ? `1px solid ${C.borderL}` : "1px solid transparent",
+              fontSize: 12,
+              fontWeight: 600,
+              fontFamily: C.fontSans,
+              cursor: "pointer",
+              letterSpacing: "-0.005em",
+              boxShadow: active ? "0 1px 2px rgba(0,0,0,0.3)" : "none",
+              transition: `all ${C.dur} ${C.ease}`,
+            }}
+          >
+            {o.label}
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+function HeroAction({ icon, label, onClick }) {
+  return (
+    <button
+      onClick={onClick}
+      className="auken-touch"
+      style={{
+        height: 36,
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 7,
+        padding: "0 12px",
+        borderRadius: C.radius,
+        background: C.surface,
+        color: C.textDim,
+        border: `1px solid ${C.border}`,
+        fontSize: 12,
+        fontWeight: 700,
+        cursor: "pointer",
+        letterSpacing: "-0.005em",
+        boxShadow: C.shadowSm,
+        transition: `all ${C.dur} ${C.ease}`,
+      }}
+      onMouseEnter={e => {
+        e.currentTarget.style.background = C.surfaceL;
+        e.currentTarget.style.color = C.text;
+        e.currentTarget.style.borderColor = C.borderL;
+      }}
+      onMouseLeave={e => {
+        e.currentTarget.style.background = C.surface;
+        e.currentTarget.style.color = C.textDim;
+        e.currentTarget.style.borderColor = C.border;
+      }}
+    >
+      {icon}
+      {label}
+    </button>
+  );
+}
+
+function WelcomeHero({ owner, optica, period, setPeriod, onAnalytics, onSettings }) {
+  const now = new Date();
+  const hour = now.getHours();
+  const greeting = hour < 12 ? "Buenos días" : hour < 19 ? "Buenas tardes" : "Buenas noches";
+  const firstName = (owner || "Operador").split(" ")[0].toUpperCase();
+  const today = now.toLocaleDateString("es-CL", { weekday: "long", day: "numeric", month: "long" });
+
+  return (
+    <div style={{
+      display: "flex",
+      justifyContent: "space-between",
+      alignItems: "flex-start",
+      gap: 24,
+      marginBottom: 24,
+      flexWrap: "wrap",
+    }}>
+      <div style={{ minWidth: 0, flex: "1 1 340px" }}>
+        <div style={{ fontSize: 12, color: C.textDim, fontWeight: 600, letterSpacing: "-0.005em", marginBottom: 7 }}>
+          {greeting} / <span style={{ color: C.textMute, textTransform: "capitalize" }}>{today}</span>
+        </div>
+        <h1 style={{
+          margin: 0,
+          fontSize: "clamp(32px, 5vw, 52px)",
+          fontWeight: 800,
+          color: C.text,
+          letterSpacing: "-0.045em",
+          lineHeight: 0.95,
+          textTransform: "uppercase",
+          fontFamily: C.fontSans,
+        }}>
+          Hola, <span style={{
+            background: `linear-gradient(135deg, ${C.primary} 0%, ${C.primaryH} 100%)`,
+            WebkitBackgroundClip: "text",
+            WebkitTextFillColor: "transparent",
+            backgroundClip: "text",
+          }}>{firstName}</span>
+        </h1>
+        <div style={{ marginTop: 10, fontSize: 13, color: C.textDim, display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <Icon name="eye" size={13} color={C.textMute} />
+            <span style={{ color: C.text, fontWeight: 700 }}>{optica || "Tu óptica"}</span>
+          </span>
+          <span style={{ color: C.textMute }}>/</span>
+          <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.green, boxShadow: "0 0 0 3px rgba(52,211,153,0.15)" }} />
+            <span style={{ color: C.textDim }}>Bot activo</span>
+          </span>
+        </div>
+      </div>
+
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap", justifyContent: "flex-end" }}>
+        <PeriodSelector value={period} onChange={setPeriod} />
+        <HeroAction icon={<Icon name="metrics" size={13} />} label="Analíticas" onClick={onAnalytics} />
+        <HeroAction icon={<Icon name="settings" size={13} />} label="Ajustes" onClick={onSettings} />
+      </div>
+    </div>
+  );
+}
+
 function Modal({ open = true, onClose, title, subtitle, children, footer, size = "md", icon }) {
   useEffect(() => {
     if (!open) return undefined;
@@ -2963,6 +3110,7 @@ export default function AukenOpticaDashboard() {
 
   // âš ï¸ FIX: Todos los useState ANTES de cualquier useEffect
   const [tab, setTab] = useState("metricas");
+  const [period, setPeriod] = useState("today");
   const [optica, setOptica] = useState(null);
   const [pacientes, setPacientes] = useState([]);
   const [citas, setCitas] = useState([]);
@@ -3166,6 +3314,14 @@ export default function AukenOpticaDashboard() {
     );
   }
 
+  const ownerName =
+    optica?.owner_nombre ||
+    optica?.config?.owner_nombre ||
+    optica?.config?.owner ||
+    optica?.config?.responsable ||
+    optica?.nombre ||
+    "Operador";
+
   return (
     <div style={{ background: C.bg, minHeight: "100vh", color: C.text, fontFamily: "'Inter', sans-serif" }}>
       <ResponsiveGlobals />
@@ -3216,6 +3372,15 @@ export default function AukenOpticaDashboard() {
 
       {/* TABS */}
       <div className="auken-shell">
+        <WelcomeHero
+          owner={ownerName}
+          optica={optica?.nombre || "Aukén"}
+          period={period}
+          setPeriod={setPeriod}
+          onAnalytics={() => setTab("metricas")}
+          onSettings={() => setTab("config")}
+        />
+
         <div className="auken-tabs">
           <DashboardTab active={tab === "metricas"} icon={<Icon name="metrics" size={14} />} label="MÃ©tricas" onClick={() => setTab("metricas")} />
           <DashboardTab active={tab === "enlive"} icon={<Icon name="chat" size={14} />} label="En Vivo" onClick={() => setTab("enlive")} />
