@@ -180,7 +180,24 @@ function getMessageKind(m) {
   return "client";
 }
 
-function ChatBubble({ kind, author, text, time, meta }) {
+function channelMeta(channel) {
+  const raw = String(channel || "wsp").toLowerCase();
+  return raw.includes("web")
+    ? { label: "Web", color: C.neon }
+    : { label: "WhatsApp", color: C.green };
+}
+
+function DateSeparator({ label }) {
+  return (
+    <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "18px 0 12px", position: "sticky", top: 8, zIndex: 2 }}>
+      <div style={{ flex: 1, height: 1, background: C.border }} />
+      <span style={{ fontSize: 10, color: C.inkFaint, padding: "4px 10px", background: C.surface, borderRadius: 999, border: `1px solid ${C.border}`, fontWeight: 700, letterSpacing: "0.05em", textTransform: "uppercase", boxShadow: "0 4px 16px rgba(0,0,0,0.28)" }}>{label}</span>
+      <div style={{ flex: 1, height: 1, background: C.border }} />
+    </div>
+  );
+}
+
+function ChatBubble({ kind, author, text, time, meta, showAvatar = true, channel = "wsp" }) {
   if (kind === "system") {
     return (
       <div style={{ display: "flex", justifyContent: "center", margin: "10px 0", animation: "fadeUp 0.2s ease-out" }}>
@@ -191,7 +208,7 @@ function ChatBubble({ kind, author, text, time, meta }) {
           fontSize: 11, color: C.inkMid, fontFamily: C.fontMono,
           maxWidth: "78%", lineHeight: 1.45,
         }}>
-          <span style={{ width: 5, height: 5, borderRadius: "50%", background: C.blue, boxShadow: `0 0 8px ${C.blue}`, flexShrink: 0 }} />
+          <span style={{ width: 5, height: 5, borderRadius: "50%", background: C.neon, boxShadow: `0 0 8px ${C.neon}`, flexShrink: 0 }} />
           <span style={{ whiteSpace: "pre-wrap" }}>{text}</span>
           {meta && <span style={{ color: C.inkFaint }}>Â· {meta}</span>}
         </div>
@@ -199,11 +216,13 @@ function ChatBubble({ kind, author, text, time, meta }) {
     );
   }
 
+  const clientColor = avatarColor(author || "Paciente");
+  const ch = channelMeta(channel);
   const styles = {
     client: {
       wrap: { justifyContent: "flex-start" },
-      bubble: { background: C.surfaceL, color: C.ink, border: `1px solid ${C.border}`, borderRadius: "4px 14px 14px 14px" },
-      avatar: { background: C.surfaceXL, color: C.inkMid, border: `1px solid ${C.border}` },
+      bubble: { background: C.surfaceL, color: C.ink, border: `1px solid ${C.border}`, borderRadius: "4px 14px 14px 14px", minWidth: 84 },
+      avatar: { background: `${clientColor}1A`, color: clientColor, border: `1px solid ${clientColor}33` },
     },
     bot: {
       wrap: { justifyContent: "flex-start" },
@@ -221,16 +240,20 @@ function ChatBubble({ kind, author, text, time, meta }) {
   return (
     <div style={{ display: "flex", gap: 8, margin: "8px 0", animation: "fadeUp 0.2s ease-out", ...styles.wrap }}>
       {!isOperator && (
-        <div style={{
-          width: 28, height: 28, borderRadius: 8,
-          display: "flex", alignItems: "center", justifyContent: "center",
-          fontSize: 10, fontWeight: 800, flexShrink: 0,
-          fontFamily: C.fontSans,
-          ...styles.avatar,
-        }}>{kind === "bot" ? "IA" : (author?.[0] || "P").toUpperCase()}</div>
+        <div style={{ width: 28, flexShrink: 0 }}>
+          {showAvatar && (
+            <div style={{
+              width: 28, height: 28, borderRadius: 8,
+              display: "flex", alignItems: "center", justifyContent: "center",
+              fontSize: 10, fontWeight: 800, flexShrink: 0,
+              fontFamily: C.fontSans,
+              ...styles.avatar,
+            }}>{kind === "bot" ? "IA" : initials(author || "P")}</div>
+          )}
+        </div>
       )}
 
-      <div style={{ maxWidth: "72%", display: "flex", flexDirection: "column", gap: 4 }}>
+      <div style={{ maxWidth: "72%", minWidth: kind === "client" ? 84 : 0, display: "flex", flexDirection: "column", gap: 4 }}>
         {kind === "bot" && (
           <span style={{ fontSize: 10, color: C.primary, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase" }}>
             AUKÃ‰N IA {meta && <span style={{ color: C.inkFaint, fontWeight: 500 }}>Â· {meta}</span>}
@@ -250,7 +273,12 @@ function ChatBubble({ kind, author, text, time, meta }) {
           fontSize: 10, color: C.inkFaint,
           alignSelf: isOperator ? "flex-end" : "flex-start",
           fontFamily: C.fontMono, fontVariantNumeric: "tabular-nums",
-        }}>{time}</span>
+          display: "inline-flex", alignItems: "center", gap: 6,
+        }}>
+          {kind === "client" && <span style={{ color: ch.color, fontWeight: 700 }}>por {ch.label}</span>}
+          {kind === "client" && <span style={{ color: C.inkFaint }}>/</span>}
+          <span>{time}</span>
+        </span>
       </div>
     </div>
   );
@@ -493,25 +521,64 @@ function ConvListHeader({ search, setSearch, filter, setFilter, count, totalUnre
 }
 
 // â”€â”€ Panel ficha derecho â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+function hasPatientValue(value) {
+  if (value === null || value === undefined) return false;
+  const v = String(value).trim().toLowerCase();
+  return !!v && v !== "pendiente" && v !== "-" && v !== "--" && v !== "—";
+}
+
+function PatientProgressRing({ pct, size = 38, stroke = 3 }) {
+  const r = (size - stroke) / 2;
+  const c = 2 * Math.PI * r;
+  const off = c - (pct / 100) * c;
+  const color = pct >= 80 ? C.green : pct >= 40 ? C.amber : C.red;
+  return (
+    <svg width={size} height={size} style={{ transform: "rotate(-90deg)", flexShrink: 0 }}>
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={C.border} strokeWidth={stroke} />
+      <circle cx={size / 2} cy={size / 2} r={r} fill="none" stroke={color} strokeWidth={stroke} strokeLinecap="round" strokeDasharray={c} strokeDashoffset={off} style={{ transition: `stroke-dashoffset 480ms ${C.ease}` }} />
+      <text x={size / 2} y={size / 2} fill={color} textAnchor="middle" dominantBaseline="central" transform={`rotate(90 ${size / 2} ${size / 2})`} style={{ fontSize: 11, fontFamily: C.fontMono, fontWeight: 800 }}>{pct}</text>
+    </svg>
+  );
+}
+
 function PatientPanel({ p, onClose, onGoToDashboard }) {
-  if (!p) return null;
+  const [patient, setPatient] = useState(p);
+  useEffect(() => setPatient(p), [p]);
+  if (!patient) return null;
+  p = patient;
   const cleanNotas = sanitizeNotas(p.notas_clinicas);
   const dias = diasReceta(p.fecha_ultima_visita);
   const recetaColor = dias === null ? C.inkFaint : dias > 365 ? C.red : dias > 335 ? C.amber : C.green;
   const recetaLabel = dias === null ? "Sin receta" : dias > 365 ? `Vencida (${dias}d)` : dias > 335 ? `PrÃ³xima (${365 - dias}d)` : "Vigente";
 
-  const fields = [
-    ["RUT",           formatRut(p.rut)],
-    ["TelÃ©fono",      p.telefono],
-    ["Comuna",        p.comuna],
-    ["Ãšltima visita", formatVisit(p.fecha_ultima_visita)],
-    ["PrÃ³x. control", formatVisit(p.fecha_proximo_control)],
-    ["Producto",      p.producto_actual],
-    ["Estado compra", labelMeta("compraState", p.estado_compra || "Pendiente").label],
+  const allFields = [
+    ["rut", "RUT", formatRut(p.rut), p.rut],
+    ["telefono", "Telefono", p.telefono, p.telefono],
+    ["comuna", "Comuna", p.comuna, p.comuna],
+    ["fecha_ultima_visita", "Ultima visita", formatVisit(p.fecha_ultima_visita), p.fecha_ultima_visita],
+    ["fecha_proximo_control", "Prox. control", formatVisit(p.fecha_proximo_control), p.fecha_proximo_control],
+    ["producto_actual", "Producto", p.producto_actual, p.producto_actual],
+    ["estado_compra", "Estado compra", labelMeta("compraState", p.estado_compra || "Pendiente").label, p.estado_compra],
   ];
+  const completeBase = allFields.filter(([, label]) => label !== "Estado compra");
+  const pct = Math.round((completeBase.filter(([, , , raw]) => hasPatientValue(raw)).length / completeBase.length) * 100);
+  const fields = allFields.filter(([, , , raw]) => hasPatientValue(raw));
+  const emptyFields = allFields.filter(([, , , raw]) => !hasPatientValue(raw));
+
+  const editField = async (key, label, currentValue) => {
+    const next = window.prompt(`Actualizar ${label}`, currentValue || "");
+    if (next === null || next === currentValue) return;
+    const patch = { [key]: next.trim() || null };
+    setPatient(prev => ({ ...prev, ...patch }));
+    const { error } = await supabase.from("pacientes").update(patch).eq("id", p.id);
+    if (error) {
+      setPatient(prev => ({ ...prev, [key]: currentValue }));
+      alert("No se pudo guardar el dato. Intenta nuevamente.");
+    }
+  };
 
   return (
-    <aside style={{ width: 270, borderLeft: `1px solid ${C.border}`, background: C.surface, display: "flex", flexDirection: "column", flexShrink: 0 }}>
+    <aside style={{ width: 320, borderLeft: `1px solid ${C.border}`, background: C.surface, display: "flex", flexDirection: "column", flexShrink: 0 }}>
       <div style={{ padding: "16px 18px 12px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <span style={{ fontSize: 10, fontWeight: 700, color: C.inkFaint, textTransform: "uppercase", letterSpacing: "0.08em" }}>Ficha Paciente</span>
         <button onClick={onClose} style={{ background: "transparent", border: "none", color: C.inkFaint, cursor: "pointer", fontSize: 18, lineHeight: 1 }}>Ã—</button>
@@ -538,16 +605,38 @@ function PatientPanel({ p, onClose, onGoToDashboard }) {
               ${Number(p.monto_venta).toLocaleString("es-CL")}
             </div>
           )}
+        <div style={{ marginTop: 12, display: "flex", alignItems: "center", gap: 10, padding: "8px 11px", borderRadius: 10, background: C.bg, border: `1px solid ${C.border}`, textAlign: "left" }}>
+          <PatientProgressRing pct={pct} />
+          <div>
+            <div style={{ fontSize: 12, color: C.ink, fontWeight: 800 }}>{pct === 100 ? "Ficha completa" : `Ficha ${pct}% completa`}</div>
+            <div style={{ fontSize: 10, color: C.inkFaint, lineHeight: 1.35 }}>Mas datos ayudan al bot a responder mejor.</div>
+          </div>
+        </div>
         </div>
 
         {/* Campos */}
-        <div style={{ display: "flex", flexDirection: "column", gap: 10 }}>
-          {fields.map(([label, val]) => (
-            <div key={label}>
-              <div style={{ fontSize: 9, color: C.inkFaint, textTransform: "uppercase", fontWeight: 700, letterSpacing: "0.07em", marginBottom: 2 }}>{label}</div>
-              <div style={{ fontSize: 12, color: val ? C.ink : C.inkFaint }}>{val || "â€”"}</div>
-            </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+          {fields.map(([key, label, val, raw]) => (
+            <button key={key} onClick={() => editField(key, label, raw || "")} style={{
+              display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8,
+              width: "100%", padding: "8px 10px", background: "transparent", border: "1px solid transparent",
+              borderRadius: 7, cursor: "pointer", textAlign: "left", transition: `all ${C.dur} ${C.ease}`,
+            }}
+            onMouseEnter={e => { e.currentTarget.style.background = C.surfaceL; e.currentTarget.style.borderColor = C.border; }}
+            onMouseLeave={e => { e.currentTarget.style.background = "transparent"; e.currentTarget.style.borderColor = "transparent"; }}>
+              <span style={{ fontSize: 10, color: C.inkFaint, textTransform: "uppercase", fontWeight: 800, letterSpacing: "0.07em", flexShrink: 0 }}>{label}</span>
+              <span style={{ fontSize: 12, color: C.ink, fontWeight: 600, textAlign: "right", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: "58%" }}>{val}</span>
+            </button>
           ))}
+          {emptyFields.length > 0 && (
+            <button onClick={() => editField(emptyFields[0][0], emptyFields[0][1], "")} style={{
+              marginTop: 4, display: "inline-flex", alignItems: "center", gap: 5, alignSelf: "flex-start",
+              background: "transparent", border: "none", color: C.primary, fontSize: 11, fontWeight: 800,
+              cursor: "pointer", padding: "4px 10px",
+            }}>
+              <Icon name="plus" size={11} /> Agregar dato
+            </button>
+          )}
         </div>
 
         {/* Receta OCR */}
@@ -1159,13 +1248,10 @@ export default function AukenOptica() {
 
                 {grouped.map(({ sep, msgs }) => (
                   <div key={sep}>
-                    <div style={{ display: "flex", alignItems: "center", gap: 8, margin: "14px 0 10px" }}>
-                      <div style={{ flex: 1, height: 1, background: C.border }} />
-                      <span style={{ fontSize: 10, color: C.inkFaint, padding: "2px 10px", background: C.surfaceL, borderRadius: 10, border: `1px solid ${C.border}`, fontWeight: 600 }}>{sep}</span>
-                      <div style={{ flex: 1, height: 1, background: C.border }} />
-                    </div>
+                    <DateSeparator label={sep} />
                     {msgs.map((m, i) => {
                       const kind = getMessageKind(m);
+                      const prevKind = i > 0 ? getMessageKind(msgs[i - 1]) : null;
                       const time = m.created_at
                         ? new Date(m.created_at).toLocaleTimeString("es-CL", { hour: "2-digit", minute: "2-digit" })
                         : "";
@@ -1177,6 +1263,8 @@ export default function AukenOptica() {
                           text={m.contenido}
                           time={time}
                           meta={kind === "bot" ? "respuesta IA" : null}
+                          showAvatar={i === 0 || kind !== prevKind}
+                          channel={m.channel || m.canal || "wsp"}
                         />
                       );
                     })}
