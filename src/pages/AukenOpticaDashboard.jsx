@@ -2445,21 +2445,139 @@ function TabCitas({ citas, refresh, optica, pacientes, onCreateCita }) {
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // TAB: CONFIGURACIÃ“N â€” con dirty-state para no perder cambios
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
+const SERVICE_PRESETS = [
+  "Examen visual computarizado",
+  "Examen visual oftalmologico",
+  "Adaptacion de lentes de contacto",
+  "Control de seguimiento",
+  "Reparacion de marcos",
+  "Lentes monofocales con marco",
+  "Lentes multifocales",
+  "Lentes de sol premium",
+];
+
+function completionFor(fields, source) {
+  const total = fields.length || 1;
+  const done = fields.filter(field => {
+    const value = source?.[field];
+    return Array.isArray(value) ? value.length > 0 : Boolean(String(value || "").trim());
+  }).length;
+  return Math.round((done / total) * 100);
+}
+
+function ConfigShell({ children, preview, nav }) {
+  return (
+    <div className="auken-config-shell" style={{ display: "grid", gridTemplateColumns: "minmax(0, 180px) minmax(0, 1fr) 360px", gap: 18, alignItems: "start" }}>
+      <div className="config-side-nav" style={{ position: "sticky", top: 78 }}>{nav}</div>
+      <div style={{ minWidth: 0 }}>{children}</div>
+      <div className="config-preview" style={{ position: "sticky", top: 78 }}>{preview}</div>
+    </div>
+  );
+}
+
+function ConfigSection({ id, icon, title, subtitle, completion, defaultOpen = true, children }) {
+  const [open, setOpen] = useState(defaultOpen);
+  return (
+    <section id={id} style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: C.radiusLg, marginBottom: 12, overflow: "hidden", boxShadow: C.shadow }}>
+      <button onClick={() => setOpen(o => !o)} className="auken-touch" style={{ width: "100%", display: "flex", alignItems: "center", gap: 14, padding: "16px 20px", textAlign: "left", background: "transparent", border: "none", cursor: "pointer" }}>
+        <div style={{ width: 32, height: 32, borderRadius: 8, flexShrink: 0, background: C.primarySoft, border: `1px solid ${C.primaryRing}`, color: C.primary, display: "flex", alignItems: "center", justifyContent: "center" }}>{icon}</div>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ display: "flex", alignItems: "baseline", gap: 8, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 14, fontWeight: 700, color: C.text, letterSpacing: "-0.01em" }}>{title}</span>
+            {typeof completion === "number" && (
+              <span style={{ fontFamily: C.fontMono, fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 4, background: completion === 100 ? C.greenSoft : C.surfaceL, color: completion === 100 ? C.green : C.textDim, border: `1px solid ${completion === 100 ? "rgba(52,211,153,0.22)" : C.border}` }}>{completion}%</span>
+            )}
+          </div>
+          {subtitle && <span style={{ display: "block", marginTop: 2, fontSize: 12, color: C.textDim }}>{subtitle}</span>}
+        </div>
+        <span style={{ color: C.textDim, fontSize: 16, fontFamily: C.fontMono, transform: open ? "rotate(90deg)" : "rotate(0deg)", transition: `transform ${C.dur} ${C.ease}` }}>{">"}</span>
+      </button>
+      {open && <div style={{ padding: "4px 20px 20px", borderTop: `1px solid ${C.border}` }}>{children}</div>}
+    </section>
+  );
+}
+
+function ConfigNav({ completion }) {
+  const items = [
+    ["identidad", "Identidad", completion.identidad],
+    ["contacto", "Contacto", completion.contacto],
+    ["bot", "Bot Auken", completion.bot],
+    ["catalogo", "Catalogo", completion.catalogo],
+  ];
+  const avg = Math.round(items.reduce((sum, item) => sum + item[2], 0) / items.length);
+  return (
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: C.radiusLg, padding: 10, boxShadow: C.shadow }}>
+      <div style={{ padding: "6px 8px 10px", borderBottom: `1px solid ${C.border}`, marginBottom: 8 }}>
+        <div style={{ fontSize: 11, color: C.textDim, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>Configuracion</div>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 6, marginTop: 5 }}>
+          <span style={{ color: C.text, fontFamily: C.fontMono, fontSize: 20, fontWeight: 700 }}>{avg}%</span>
+          <span style={{ color: C.textMuted, fontSize: 11 }}>completo</span>
+        </div>
+      </div>
+      {items.map(([id, label, pct]) => (
+        <a key={id} href={`#${id}`} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, height: 30, padding: "0 8px", borderRadius: 7, color: C.textDim, textDecoration: "none", fontSize: 12, fontWeight: 600 }}>
+          <span>{label}</span>
+          <span style={{ color: pct === 100 ? C.green : C.textMuted, fontFamily: C.fontMono, fontSize: 10 }}>{pct}%</span>
+        </a>
+      ))}
+    </div>
+  );
+}
+
+function BotConfigPreview({ config }) {
+  const services = (config.servicios || []).filter(s => s?.nombre).slice(0, 3);
+  return (
+    <div style={{ background: C.surface, border: `1px solid ${C.border}`, borderRadius: C.radiusLg, overflow: "hidden", boxShadow: C.shadow }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 14px", borderBottom: `1px solid ${C.border}`, background: C.surfaceL }}>
+        <span style={{ width: 6, height: 6, borderRadius: "50%", background: C.green, boxShadow: "0 0 0 3px rgba(52,211,153,0.15)" }} />
+        <span style={{ fontSize: 11, color: C.textDim, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>Vista previa del bot</span>
+      </div>
+      <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 10, background: "#0A0B0F", minHeight: 304 }}>
+        <div style={{ alignSelf: "flex-end", maxWidth: "78%" }}>
+          <div style={{ padding: "8px 12px", background: C.surfaceL, border: `1px solid ${C.border}`, borderRadius: "14px 4px 14px 14px", fontSize: 13, color: C.text }}>Hola, que horarios y servicios tienen?</div>
+        </div>
+        <div style={{ alignSelf: "flex-start", maxWidth: "88%" }}>
+          <span style={{ fontSize: 10, color: C.primary, fontWeight: 700, letterSpacing: "0.04em", textTransform: "uppercase", display: "block", marginBottom: 4 }}>{config.bot_nombre || "Auken"} IA</span>
+          <div style={{ padding: "8px 12px", background: "rgba(249,115,22,0.06)", border: "1px solid rgba(249,115,22,0.20)", borderRadius: "4px 14px 14px 14px", fontSize: 13, color: C.text, lineHeight: 1.5 }}>
+            Hola, soy {config.bot_nombre || "Auken"}, asistente de <strong>{config.nombre || "tu optica"}</strong>{config.ciudad ? <> en {config.ciudad}</> : null}. Atendemos {config.horario || "en horario comercial"}.
+            {config.promocion_estrella ? <> Esta semana tenemos <strong style={{ color: C.primary }}>{config.promocion_estrella}</strong>.</> : null}
+            {services.length > 0 ? <> Tambien ofrecemos {services.map(s => s.nombre).join(", ")}.</> : null} En que te puedo ayudar?
+          </div>
+        </div>
+        <div style={{ marginTop: "auto", paddingTop: 12, borderTop: `1px solid ${C.border}`, display: "flex", flexDirection: "column", gap: 6 }}>
+          <span style={{ color: C.textMuted, fontSize: 10, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>Datos que usara la IA</span>
+          {[config.telefono, config.numero_escalada, services[0]?.precio ? `CLP ${Number(services[0].precio || 0).toLocaleString("es-CL")}` : null].filter(Boolean).map((item, i) => (
+            <span key={i} style={{ color: C.textDim, fontSize: 11, fontFamily: C.fontMono, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{item}</span>
+          ))}
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function ServiceRow({ row, onChange, onRemove }) {
+  return (
+    <div className="service-row" style={{ display: "grid", gridTemplateColumns: "20px minmax(0, 1fr) 150px 32px", gap: 8, alignItems: "center", padding: "6px 8px", background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8 }}>
+      <span title="Orden manual proximamente" style={{ color: C.textMuted, fontSize: 11, fontFamily: C.fontMono, cursor: "grab", textAlign: "center", userSelect: "none" }}>::</span>
+      <input list="servicio-presets" value={row.nombre || ""} onChange={e => onChange("nombre", e.target.value)} placeholder="Examen visual computarizado" style={{ width: "100%", height: 32, background: "transparent", border: "none", outline: "none", color: C.text, fontSize: 13, fontFamily: C.fontSans }} />
+      <div style={{ display: "flex", alignItems: "center", gap: 4, minWidth: 0 }}>
+        <span style={{ fontSize: 11, color: C.textMuted, fontFamily: C.fontMono }}>CLP</span>
+        <input type="number" min="0" step="1000" value={row.precio || ""} onChange={e => onChange("precio", e.target.value)} placeholder="0" style={{ width: "100%", height: 32, background: "transparent", border: "none", outline: "none", color: C.text, fontSize: 13, fontFamily: C.fontMono, textAlign: "right", fontVariantNumeric: "tabular-nums" }} />
+      </div>
+      <button onClick={onRemove} aria-label="Eliminar servicio" style={{ width: 28, height: 28, borderRadius: 6, background: "transparent", border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}>
+        <Icon name="x" size={13} />
+      </button>
+    </div>
+  );
+}
+
 function TabConfiguracion({ optica, refresh }) {
   const [edit, setEdit] = useState(optica);
-  const [dirty, setDirty] = useState(false);   // true = hay cambios sin guardar
-  // Guarda el Ãºltimo payload guardado para que el useEffect no lo pise
-  // cuando refresh() devuelve datos de BD que aÃºn no tienen la columna servicios
-  // (es decir, antes de ejecutar la migraciÃ³n 007)
+  const [dirty, setDirty] = useState(false);
   const lastSavedRef = useRef(null);
 
-  // Solo sincronizar desde la BD si el usuario NO estÃ¡ editando activamente.
-  // Merge con lastSavedRef para preservar campos que la BD aÃºn no devuelve
-  // (migraciÃ³n 007 pendiente â†’ servicios/ciudad/etc. vendrÃ¡n null hasta ejecutarla).
   useEffect(() => {
-    if (!dirty) {
-      setEdit({ ...(optica || {}), ...(lastSavedRef.current || {}) });
-    }
+    if (!dirty) setEdit({ ...(optica || {}), ...(lastSavedRef.current || {}) });
   }, [optica, dirty]);
 
   const upd = (field, value) => {
@@ -2468,7 +2586,6 @@ function TabConfiguracion({ optica, refresh }) {
   };
 
   const saveConfig = useCallback(async (nextEdit) => {
-    // Asegurarse de que servicios/escalar_si sean arrays JSON vÃ¡lidos
     const serviciosClean = Array.isArray(nextEdit.servicios)
       ? nextEdit.servicios.filter(s => s && (s.nombre || s.precio))
       : [];
@@ -2477,28 +2594,24 @@ function TabConfiguracion({ optica, refresh }) {
       : [];
 
     const payload = {
-      nombre:              nextEdit.nombre            || "",
-      slogan:              nextEdit.slogan            || "",
-      direccion:           nextEdit.direccion         || "",
-      ciudad:              nextEdit.ciudad            || "",
-      telefono:            nextEdit.telefono          || "",
-      whatsapp:            nextEdit.whatsapp          || "",
-      horario:             nextEdit.horario           || "",
-      numero_escalada:     nextEdit.numero_escalada   || "",
-      bot_nombre:          nextEdit.bot_nombre        || "AukÃ©n",
-      promocion_estrella:  nextEdit.promocion_estrella|| "",
-      servicios:           serviciosClean,
-      escalar_si:          escalarSiClean,
+      nombre: nextEdit.nombre || "",
+      slogan: nextEdit.slogan || "",
+      direccion: nextEdit.direccion || "",
+      ciudad: nextEdit.ciudad || "",
+      telefono: nextEdit.telefono || "",
+      whatsapp: nextEdit.whatsapp || "",
+      horario: nextEdit.horario || "",
+      numero_escalada: nextEdit.numero_escalada || "",
+      bot_nombre: nextEdit.bot_nombre || "Auken",
+      promocion_estrella: nextEdit.promocion_estrella || "",
+      servicios: serviciosClean,
+      escalar_si: escalarSiClean,
     };
 
-    const { error } = await supabase
-      .from("opticas")
-      .update(payload)
-      .eq("id", optica.id);
-
+    const { error } = await supabase.from("opticas").update(payload).eq("id", optica.id);
     if (!error) {
-      lastSavedRef.current = payload;  // â† preserva lo guardado ante refresh() con BD sin migraciÃ³n 007
-      setDirty(false);                 // â† limpia dirty para que el useEffect sincronice (con merge)
+      lastSavedRef.current = payload;
+      setDirty(false);
       refresh();
     } else {
       console.error("[config] Error guardando:", error);
@@ -2519,8 +2632,8 @@ function TabConfiguracion({ optica, refresh }) {
     setEdit(prev => ({ ...prev, servicios: arr }));
     setDirty(true);
   };
-  const addServicio = () => {
-    setEdit(prev => ({ ...prev, servicios: [...(prev.servicios || []), { nombre: "", precio: "" }] }));
+  const addServicio = (preset = "") => {
+    setEdit(prev => ({ ...prev, servicios: [...(prev.servicios || []), { nombre: preset, precio: "" }] }));
     setDirty(true);
   };
   const removeServicio = (idx) => {
@@ -2528,122 +2641,113 @@ function TabConfiguracion({ optica, refresh }) {
     setDirty(true);
   };
 
-  const Field = ({ label, value, onChange, ph }) => (
-    <ConfigField label={label} success={fieldSaved}>
-      <input value={value || ""} onChange={(e) => onChange(e.target.value)} placeholder={ph}
+  const Field = ({ label, value, onChange, ph, hint, type = "text" }) => (
+    <ConfigField label={label} hint={hint} success={fieldSaved}>
+      <input type={type} value={value || ""} onChange={(e) => onChange(e.target.value)} placeholder={ph}
         style={{ width: "100%", background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13 }} />
     </ConfigField>
   );
 
-  // Detectar si la BD aÃºn no tiene la columna servicios (migraciÃ³n 007 pendiente)
+  const completion = {
+    identidad: completionFor(["nombre", "slogan"], edit),
+    contacto: completionFor(["direccion", "ciudad", "telefono", "numero_escalada", "horario"], edit),
+    bot: completionFor(["bot_nombre", "promocion_estrella"], edit),
+    catalogo: (edit.servicios || []).filter(s => s?.nombre && s?.precio).length > 0 ? 100 : 0,
+  };
   const needsMigration007 = optica && (optica.servicios === undefined || optica.servicios === null) && !lastSavedRef.current;
 
   return (
-    <Card>
-      {/* Banner migraciÃ³n 007 â€” se oculta automÃ¡ticamente tras ejecutar la migraciÃ³n */}
+    <>
+      <style>{`
+        @media (max-width: 1120px) {
+          .auken-config-shell { grid-template-columns: minmax(0, 1fr) !important; }
+          .config-side-nav { display: none; }
+          .config-preview { position: static !important; }
+        }
+        @media (max-width: 560px) {
+          .service-preset-row { grid-template-columns: 1fr !important; }
+          .service-row { grid-template-columns: 20px minmax(0, 1fr) !important; }
+          .service-row > div, .service-row > button { grid-column: 2; }
+        }
+      `}</style>
+
       {needsMigration007 && (
-        <div style={{
-          background: `${C.amber}12`, border: `1px solid ${C.amber}40`,
-          borderRadius: 10, padding: "12px 16px", marginBottom: 20,
-          fontSize: 12, color: C.amber, lineHeight: 1.6,
-        }}>
-          <div style={{ fontWeight: 700, marginBottom: 4, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon name="warning" size={14} /> MigraciÃ³n 007 requerida para guardar Servicios</div>
-          <div style={{ color: C.textDim }}>
-            Los cambios de nombre/horario/telÃ©fono ya se guardan correctamente.
-            Para que los <strong style={{ color: C.amber }}>servicios y precios</strong> persistan en la BD, ejecuta la migraciÃ³n en:
-            <br />
-            <strong style={{ color: C.text }}>Supabase â†’ SQL Editor â†’ migrations/007_opticas_completar_columnas.sql</strong>
-          </div>
+        <div style={{ background: `${C.amber}12`, border: `1px solid ${C.amber}40`, borderRadius: 10, padding: "12px 16px", marginBottom: 16, fontSize: 12, color: C.amber, lineHeight: 1.6 }}>
+          <div style={{ fontWeight: 700, marginBottom: 4, display: "inline-flex", alignItems: "center", gap: 6 }}><Icon name="warning" size={14} /> Migracion 007 requerida para guardar Servicios</div>
+          <div style={{ color: C.textDim }}>Los cambios principales se guardan. Para persistir servicios y precios en BD, ejecuta migrations/007_opticas_completar_columnas.sql.</div>
         </div>
       )}
 
-      <div style={{ marginBottom: 24 }}>
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8, marginBottom: 6 }}>
-          <h3 style={{ fontSize: 18, fontWeight: 700, color: C.text, display: "inline-flex", alignItems: "center", gap: 8 }}><Icon name="settings" size={18} /> ConfiguraciÃ³n de la Ã“ptica</h3>
-          <SaveStatus state={autosave.state} savedAt={autosave.savedAt} error={autosave.error} onRetry={retrySave} />
+      <div style={{ marginBottom: 16, display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+        <div>
+          <h3 style={{ fontSize: 18, fontWeight: 700, color: C.text, display: "inline-flex", alignItems: "center", gap: 8, margin: 0 }}><Icon name="settings" size={18} /> Configuracion de la optica</h3>
+          <p style={{ fontSize: 13, color: C.textDim, marginTop: 5 }}>Configura lo que el bot dice, cotiza y escala en conversaciones reales.</p>
         </div>
-        <p style={{ fontSize: 13, color: C.textDim }}>Estos datos los usa el bot AukÃ©n automÃ¡ticamente en cada conversaciÃ³n.</p>
+        <SaveStatus state={autosave.state} savedAt={autosave.savedAt} error={autosave.error} onRetry={retrySave} />
       </div>
 
-      <div style={{ display: "grid", gap: 16 }}>
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-          <Field label="Nombre comercial" value={edit.nombre} onChange={v => upd("nombre", v)} ph="Ã“ptica Glow Vision" />
-          <Field label="Slogan" value={edit.slogan} onChange={v => upd("slogan", v)} ph="calidad que inspira" />
-        </div>
+      <ConfigShell nav={<ConfigNav completion={completion} />} preview={<BotConfigPreview config={edit || {}} />}>
+        <ConfigSection id="identidad" icon={<Icon name="eye" size={16} />} title="Identidad de la optica" subtitle="Nombre comercial, slogan y senales de marca" completion={completion.identidad}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+            <Field label="Nombre comercial" value={edit.nombre} onChange={v => upd("nombre", v)} ph="Optica Glow Vision" />
+            <Field label="Slogan" value={edit.slogan} onChange={v => upd("slogan", v)} ph="calidad que inspira" />
+          </div>
+        </ConfigSection>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
-          <Field label="DirecciÃ³n" value={edit.direccion} onChange={v => upd("direccion", v)} ph="CaupolicÃ¡n #763" />
-          <Field label="Ciudad" value={edit.ciudad} onChange={v => upd("ciudad", v)} ph="Punitaqui" />
-        </div>
+        <ConfigSection id="contacto" icon={<Icon name="phone" size={16} />} title="Contacto y horarios" subtitle="Datos publicos que la IA usa para responder" completion={completion.contacto}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+            <Field label="Direccion" value={edit.direccion} onChange={v => upd("direccion", v)} ph="Caupolican #763" />
+            <Field label="Ciudad" value={edit.ciudad} onChange={v => upd("ciudad", v)} ph="Punitaqui" />
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+            <Field label="Telefono general" value={edit.telefono} onChange={v => upd("telefono", v)} ph="+56 9 5493 2802" />
+            <Field label="WhatsApp escalada" value={edit.numero_escalada} onChange={v => upd("numero_escalada", v)} ph="+56954932802" hint="Numero humano para casos que la IA debe derivar." />
+          </div>
+          <Field label="Horario de atencion" value={edit.horario} onChange={v => upd("horario", v)} ph="Lun-Vie 9:00-19:00, Sab 10:00-14:00" />
+        </ConfigSection>
 
-        <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 12 }}>
-          <Field label="TelÃ©fono general" value={edit.telefono} onChange={v => upd("telefono", v)} ph="+56 9 5493 2802" />
-          <Field label="WhatsApp escalada (dueÃ±o)" value={edit.numero_escalada} onChange={v => upd("numero_escalada", v)} ph="+56954932802" />
-        </div>
+        <ConfigSection id="bot" icon={<Icon name="bot" size={16} />} title="Bot Auken" subtitle="Nombre, promocion activa y tono comercial" completion={completion.bot}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 12 }}>
+            <Field label="Nombre del bot" value={edit.bot_nombre} onChange={v => upd("bot_nombre", v)} ph="Glow" />
+            <Field label="Promocion estrella" value={edit.promocion_estrella} onChange={v => upd("promocion_estrella", v)} ph="2x1 en lentes de sol premium" />
+          </div>
+        </ConfigSection>
 
-        <Field label="Horario de atenciÃ³n" value={edit.horario} onChange={v => upd("horario", v)} ph="Lunes a Viernes 11:30 a 18:30" />
-        <Field label="PromociÃ³n estrella" value={edit.promocion_estrella} onChange={v => upd("promocion_estrella", v)} ph="Examen visual GRATIS al comprar tus lentes" />
-        <Field label="Nombre del bot" value={edit.bot_nombre} onChange={v => upd("bot_nombre", v)} ph="AukÃ©n" />
-
-        {/* SERVICIOS */}
-        <div>
-          <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: C.textDim, textTransform: "uppercase", marginBottom: 8, letterSpacing: "0.05em" }}>
-            Servicios y precios ({(edit.servicios || []).length})
-          </label>
-          <div style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 8, padding: 12, display: "flex", flexDirection: "column", gap: 8 }}>
+        <ConfigSection id="catalogo" icon={<Icon name="money" size={16} />} title="Catalogo de servicios" subtitle="El bot cotiza y responde usando estos precios" completion={completion.catalogo}>
+          <datalist id="servicio-presets">
+            {SERVICE_PRESETS.map(s => <option key={s} value={s} />)}
+          </datalist>
+          <div className="service-preset-row" style={{ display: "grid", gridTemplateColumns: "repeat(4, minmax(0, 1fr))", gap: 6, marginBottom: 12 }}>
+            {SERVICE_PRESETS.slice(0, 4).map(preset => (
+              <button key={preset} onClick={() => addServicio(preset)} style={{ minHeight: 34, padding: "6px 8px", borderRadius: 7, background: C.bg, border: `1px dashed ${C.borderStrong}`, color: C.textDim, fontSize: 11, fontWeight: 600, cursor: "pointer", textAlign: "left" }}>
+                <Icon name="plus" size={11} /> {preset}
+              </button>
+            ))}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
             {(edit.servicios || []).length === 0 && (
-              <div style={{ color: C.textMuted, fontSize: 12, textAlign: "center", padding: "8px 0" }}>
-                Sin servicios. Agrega el primero con el botÃ³n de abajo.
-              </div>
+              <div style={{ color: C.textMuted, fontSize: 12, textAlign: "center", padding: "14px 0", background: C.bg, border: `1px dashed ${C.border}`, borderRadius: 8 }}>Sin servicios. Agrega una plantilla o crea uno manualmente.</div>
             )}
             {(edit.servicios || []).map((s, i) => (
-              <div key={i} style={{ display: "flex", gap: 8, alignItems: "center" }}>
-                <input
-                  value={s.nombre || ""}
-                  onChange={(e) => updateServicio(i, "nombre", e.target.value)}
-                  placeholder="Nombre del servicio"
-                  style={{ flex: 2, background: C.surfaceL, border: `1px solid ${C.border}`, color: C.text, padding: "8px 12px", borderRadius: 6, fontSize: 12, outline: "none", minWidth: 0 }}
-                />
-                <input
-                  value={s.precio || ""}
-                  onChange={(e) => updateServicio(i, "precio", e.target.value)}
-                  placeholder="$45.000"
-                  style={{ flex: 1, background: C.surfaceL, border: `1px solid ${C.border}`, color: C.text, padding: "8px 12px", borderRadius: 6, fontSize: 12, outline: "none", minWidth: 0 }}
-                />
-                <button
-                  onClick={() => removeServicio(i)}
-                  title="Eliminar servicio"
-                  style={{ background: `${C.red}20`, color: C.red, border: `1px solid ${C.red}40`, width: 32, height: 32, borderRadius: 6, cursor: "pointer", fontSize: 16, flexShrink: 0, display: "flex", alignItems: "center", justifyContent: "center" }}
-                >Ã—</button>
-              </div>
+              <ServiceRow key={i} row={s} onChange={(key, value) => updateServicio(i, key, value)} onRemove={() => removeServicio(i)} />
             ))}
-            <button
-              onClick={addServicio}
-              style={{ background: `${C.primary}15`, color: C.primary, border: `1px dashed ${C.primary}50`, padding: "9px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 600, marginTop: 2 }}
-            >
-              + Agregar servicio
-            </button>
           </div>
-        </div>
+          <button onClick={() => addServicio()} style={{ marginTop: 10, minHeight: 36, padding: "0 12px", display: "inline-flex", alignItems: "center", gap: 7, borderRadius: 8, background: C.primarySoft, color: C.primary, border: `1px solid ${C.primaryRing}`, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
+            <Icon name="plus" size={12} /> Agregar servicio vacio
+          </button>
+        </ConfigSection>
 
-        {/* ERROR */}
         {autosave.state === "error" && (
           <div style={{ background: `${C.red}15`, border: `1px solid ${C.red}40`, borderRadius: 8, padding: "10px 14px", fontSize: 12, color: C.red }}>
             <Icon name="warning" size={13} /> Error al guardar: {autosave.error}
-            <br /><span style={{ color: C.textDim, fontSize: 11 }}>
-              Si el error menciona una columna, ejecuta la migraciÃ³n 007 en Supabase SQL Editor.
-            </span>
-            <button onClick={retrySave} style={{ marginLeft: 10, background: "transparent", border: "none", color: C.red, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>
-              Reintentar
-            </button>
+            <button onClick={retrySave} style={{ marginLeft: 10, background: "transparent", border: "none", color: C.red, fontSize: 12, fontWeight: 700, cursor: "pointer" }}>Reintentar</button>
           </div>
         )}
-      </div>
-    </Card>
+      </ConfigShell>
+    </>
   );
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // MODAL: NUEVO / EDITAR PACIENTE
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function PatientModal({ patient, opticaId, onClose, refresh }) {
