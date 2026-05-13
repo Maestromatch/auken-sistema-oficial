@@ -1214,6 +1214,112 @@ function CellIdentity({ name, sub, color = C.primary }) {
   );
 }
 
+function TableToolbar({
+  title,
+  subtitle,
+  count,
+  search,
+  onSearch,
+  filters = [],
+  activeFilter,
+  onFilter,
+  primaryAction,
+  secondaryActions = [],
+}) {
+  const inputRef = useRef(null);
+
+  useEffect(() => {
+    const onKey = (e) => {
+      const tag = document.activeElement?.tagName;
+      if (e.key === "/" && tag !== "INPUT" && tag !== "TEXTAREA") {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  return (
+    <div style={{ padding: "14px 18px", borderBottom: `1px solid ${C.border}`, background: C.surface, display: "flex", flexDirection: "column", gap: 12 }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "baseline", gap: 10, minWidth: 0 }}>
+          <h2 style={{ margin: 0, fontSize: 15, fontWeight: 700, color: C.text, letterSpacing: "-0.01em" }}>{title}</h2>
+          <span style={{ fontSize: 12, color: C.textDim, fontFamily: C.fontMono, fontVariantNumeric: "tabular-nums" }}>{count}{subtitle && ` · ${subtitle}`}</span>
+        </div>
+        <div style={{ display: "flex", gap: 6, alignItems: "center", flexWrap: "wrap" }}>
+          {secondaryActions.map(a => (
+            <button key={a.label} onClick={a.run} style={{ height: 30, padding: "0 10px", borderRadius: 7, background: "transparent", color: a.active ? C.primary : C.textDim, border: `1px solid ${a.active ? C.primaryRing : C.border}`, fontSize: 12, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}>
+              {a.icon}{a.label}
+            </button>
+          ))}
+          {primaryAction && (
+            <button onClick={primaryAction.run} style={{ height: 30, padding: "0 12px", borderRadius: 7, background: C.primary, color: C.textInv, border: `1px solid ${C.primary}`, fontSize: 12, fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5, letterSpacing: "-0.005em" }}>
+              <Icon name="plus" size={12} />{primaryAction.label}
+            </button>
+          )}
+        </div>
+      </div>
+      <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+        <div style={{ position: "relative", flex: "1 1 280px", maxWidth: 420 }}>
+          <span style={{ position: "absolute", left: 10, top: "50%", transform: "translateY(-50%)", color: C.textDim, pointerEvents: "none", display: "inline-flex" }}><Icon name="search" size={14} /></span>
+          <input ref={inputRef} value={search} onChange={e => onSearch(e.target.value)} placeholder="Buscar por nombre, RUT o telefono..." style={{ width: "100%", height: 32, padding: "0 36px 0 32px", background: C.bg, color: C.text, border: `1px solid ${C.border}`, borderRadius: 7, outline: "none", fontSize: 13, fontFamily: C.fontSans, caretColor: C.primary }} />
+          {search ? (
+            <button onClick={() => onSearch("")} aria-label="Limpiar busqueda" style={{ position: "absolute", right: 7, top: "50%", transform: "translateY(-50%)", width: 20, height: 20, borderRadius: 5, background: "transparent", border: "none", color: C.textDim, cursor: "pointer", display: "inline-flex", alignItems: "center", justifyContent: "center" }}><Icon name="x" size={12} /></button>
+          ) : (
+            <kbd style={{ position: "absolute", right: 8, top: "50%", transform: "translateY(-50%)", padding: "1px 5px", borderRadius: 4, background: C.surfaceL, border: `1px solid ${C.border}`, color: C.textDim, fontSize: 10, fontFamily: C.fontMono }}>/</kbd>
+          )}
+        </div>
+        {filters.length > 0 && (
+          <div style={{ display: "flex", gap: 4, flexWrap: "wrap" }}>
+            {filters.map(f => {
+              const active = activeFilter === f.id;
+              return (
+                <button key={f.id} onClick={() => onFilter(active ? null : f.id)} style={{ height: 28, padding: "0 10px", borderRadius: 7, background: active ? C.primarySoft : "transparent", color: active ? C.primary : C.textDim, border: `1px solid ${active ? C.primaryRing : C.border}`, fontSize: 12, fontWeight: 600, cursor: "pointer", display: "inline-flex", alignItems: "center", gap: 5 }}>
+                  {f.label}
+                  {typeof f.count === "number" && <span style={{ fontFamily: C.fontMono, fontSize: 10, fontWeight: 700, padding: "0 5px", borderRadius: 3, background: active ? "rgba(249,115,22,0.20)" : C.surfaceL, color: active ? C.primary : C.textDim, fontVariantNumeric: "tabular-nums" }}>{f.count}</span>}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function fuzzyMatch(text, query) {
+  const t = String(text || "");
+  const q = String(query || "").toLowerCase().trim();
+  if (!q) return { match: true, parts: [{ text: t, hl: false }] };
+  const i = t.toLowerCase().indexOf(q);
+  if (i < 0) return { match: false, parts: [{ text: t, hl: false }] };
+  return {
+    match: true,
+    parts: [
+      { text: t.slice(0, i), hl: false },
+      { text: t.slice(i, i + q.length), hl: true },
+      { text: t.slice(i + q.length), hl: false },
+    ],
+  };
+}
+
+function hasQueryMatch(values, query) {
+  const q = String(query || "").trim();
+  if (!q) return true;
+  return values.some(value => fuzzyMatch(value, q).match);
+}
+
+function HL({ text, query }) {
+  const match = fuzzyMatch(text, query);
+  return <>{match.parts.map((part, i) => part.hl ? <mark key={i} style={{ background: "rgba(249,115,22,0.25)", color: C.primary, padding: "1px 2px", borderRadius: 2 }}>{part.text}</mark> : <span key={i}>{part.text}</span>)}</>;
+}
+
+function recetaStateForPatient(p) {
+  const dias = p?.fecha_ultima_visita ? Math.floor((Date.now() - new Date(p.fecha_ultima_visita).getTime()) / (1000 * 60 * 60 * 24)) : null;
+  return dias === null ? "sin_datos" : dias > 365 ? "vencida" : dias > 335 ? "proxima" : "vigente";
+}
+
 function DataTable({ rows, columns, onRowClick, rowActions, bulkActions, getRowId = r => r.id, empty }) {
   const [selected, setSelected] = useState(new Set());
   const [scrolled, setScrolled] = useState(false);
@@ -1750,14 +1856,31 @@ function TabMetricas({ optica, stats }) {
 function TabPacientes({ optica, pacientes, refresh, handleSendWhatsApp, onEdit, onCreate }) {
   const { isMobile } = useViewport();
   const [search, setSearch] = useState("");
-  const filtered = search.trim()
-    ? pacientes.filter(p => {
-        const q = search.toLowerCase();
-        return (p.nombre?.toLowerCase().includes(q)) ||
-               (p.rut?.toLowerCase().includes(q)) ||
-               (p.telefono?.includes(q));
-      })
-    : pacientes;
+  const [filter, setFilter] = useState(null);
+
+  const patientMatchesFilter = (p, f) => {
+    const receta = recetaStateForPatient(p);
+    if (!f) return true;
+    if (f === "recetaVigente") return receta === "vigente";
+    if (f === "porVencer") return receta === "proxima";
+    if (f === "vencidas") return receta === "vencida";
+    if (f === "sinReceta") return receta === "sin_datos";
+    if (f === "rutPendiente") return !p.rut || p.rut === "pendiente";
+    return true;
+  };
+
+  const filtered = pacientes.filter(p =>
+    hasQueryMatch([p.nombre, p.rut, formatRut(p.rut), p.telefono, p.comuna, p.producto_actual], search) &&
+    patientMatchesFilter(p, filter)
+  );
+
+  const filterCounts = {
+    recetaVigente: pacientes.filter(p => recetaStateForPatient(p) === "vigente").length,
+    porVencer: pacientes.filter(p => recetaStateForPatient(p) === "proxima").length,
+    vencidas: pacientes.filter(p => recetaStateForPatient(p) === "vencida").length,
+    sinReceta: pacientes.filter(p => recetaStateForPatient(p) === "sin_datos").length,
+    rutPendiente: pacientes.filter(p => !p.rut || p.rut === "pendiente").length,
+  };
 
   const exportSelected = (ids) => {
     const picked = filtered.filter(p => ids.includes(p.id));
@@ -1781,340 +1904,80 @@ function TabPacientes({ optica, pacientes, refresh, handleSendWhatsApp, onEdit, 
 
   return (
     <Card style={{ padding: 0 }}>
-      <div style={{ padding: "16px 20px", borderBottom: `1px solid ${C.border}`, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 12, flexWrap: "wrap" }}>
-        <div>
-          <div style={{ fontSize: 16, fontWeight: 600, color: C.text }}>Base de Datos de Pacientes</div>
-          <div style={{ fontSize: 12, color: C.textDim, marginTop: 2 }}>
-            {filtered.length !== pacientes.length ? `${filtered.length} de ${pacientes.length} mostrados` : `${pacientes.length} registrados`}
-          </div>
-        </div>
-        <div style={{ display: "flex", gap: 8, alignItems: "center", flex: 1, maxWidth: isMobile ? "100%" : 340 }}>
-          <input
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            placeholder="Buscar nombre, RUT o telÃ©fono..."
-            style={{ flex: 1, background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "8px 14px", borderRadius: 8, outline: "none", fontSize: 13 }}
-          />
-          {search && (
-            <button onClick={() => setSearch("")}
-              style={{ background: "transparent", border: "none", color: C.textMuted, cursor: "pointer", fontSize: 20, lineHeight: 1 }}>Ã—</button>
-          )}
-        </div>
-        <button onClick={onCreate} style={{
-          background: C.primary, color: "#000", border: "none", borderRadius: 6,
-          padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap",
-        }}>+ Nuevo</button>
-      </div>
+      <TableToolbar
+        title="Base de Datos de Pacientes"
+        subtitle="registrados"
+        count={`${filtered.length} de ${pacientes.length}`}
+        search={search}
+        onSearch={setSearch}
+        filters={[
+          { id: "recetaVigente", label: "Receta vigente", count: filterCounts.recetaVigente },
+          { id: "porVencer", label: "Por vencer", count: filterCounts.porVencer },
+          { id: "vencidas", label: "Vencidas", count: filterCounts.vencidas },
+          { id: "sinReceta", label: "Sin receta", count: filterCounts.sinReceta },
+          { id: "rutPendiente", label: "RUT pendiente", count: filterCounts.rutPendiente },
+        ]}
+        activeFilter={filter}
+        onFilter={setFilter}
+        primaryAction={{ label: "Nuevo paciente", run: onCreate }}
+        secondaryActions={[{ icon: <Icon name="file" size={12} />, label: "Exportar CSV", run: () => exportSelected(filtered.map(p => p.id)) }]}
+      />
 
-      {/* MOBILE: tarjetas */}
       {isMobile ? (
         <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
           {filtered.length === 0 && (
-            search
-              ? <div style={{ padding: 24, textAlign: "center", color: C.textDim, fontSize: 13 }}>Sin resultados para "<strong style={{ color: C.text }}>{search}</strong>"</div>
-              : <EmptyState
-                  title="Sin pacientes todavÃ­a"
-                  body="El bot los captura automÃ¡ticamente desde WhatsApp, o agrÃ©galos tÃº manualmente."
-                  cta="+ Agregar paciente"
-                  onCta={onCreate}
-                  accent={C.primary}
-                />
+            search || filter
+              ? <div style={{ padding: 24, textAlign: "center", color: C.textDim, fontSize: 13 }}>Sin resultados para "<strong style={{ color: C.text }}>{search || filter}</strong>"</div>
+              : <EmptyState title="Sin pacientes todavia" body="El bot los captura automaticamente desde WhatsApp, o agregalos manualmente." cta="+ Agregar paciente" onCta={onCreate} accent={C.primary} />
           )}
           {filtered.map(p => {
-            const dias = p.fecha_ultima_visita
-              ? Math.floor((Date.now() - new Date(p.fecha_ultima_visita).getTime()) / (1000 * 60 * 60 * 24))
-              : null;
-            const estado = dias === null ? "sin_datos" : dias > 365 ? "vencida" : dias > 335 ? "proxima" : "vigente";
-            const estadoColor = estado === "vencida" ? C.red : estado === "proxima" ? C.amber : estado === "vigente" ? C.green : C.textMuted;
-            const estadoLabel = estado === "vencida" ? `Vencida (${dias}d)` : estado === "proxima" ? `PrÃ³x. (${365 - dias}d)` : estado === "vigente" ? "Vigente" : "Sin receta";
+            const estado = recetaStateForPatient(p);
             return (
-              <div key={p.id} onClick={() => onEdit(p)} style={{
-                background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: "12px 14px", cursor: "pointer",
-              }}>
-                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start" }}>
-                  <div>
-                    <div style={{ fontWeight: 700, color: C.text, fontSize: 14 }}>{p.nombre || "Sin nombre"}</div>
-                    <div style={{ fontSize: 11, color: C.textDim, marginTop: 2 }}>{formatRut(p.rut)} · {p.telefono || "sin teléfono"}</div>
+              <div key={p.id} onClick={() => onEdit(p)} style={{ background: C.bg, border: `1px solid ${C.border}`, borderRadius: 10, padding: "12px 14px", cursor: "pointer" }}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 10 }}>
+                  <div style={{ minWidth: 0 }}>
+                    <div style={{ fontWeight: 700, color: C.text, fontSize: 14, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}><HL text={p.nombre || "Sin nombre"} query={search} /></div>
+                    <div style={{ fontSize: 11, color: C.textDim, marginTop: 2 }}><HL text={formatRut(p.rut)} query={search} /> ? <HL text={p.telefono || "sin telefono"} query={search} /></div>
                   </div>
                   <StatePill kind="recetaState" value={estado} size="sm" />
                 </div>
                 <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
-                  <button onClick={(e) => { e.stopPropagation(); handleSendWhatsApp(p); }}
-                    style={{ flex: 1, background: "rgba(37,211,102,0.15)", border: "1px solid #25D36640", color: "#25D366", borderRadius: 6, padding: "7px", cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
-                    <Icon name="phone" size={13} /> WhatsApp
-                  </button>
-                  <button onClick={(e) => { e.stopPropagation(); onEdit(p); }}
-                    style={{ flex: 1, background: `${C.primary}15`, color: C.primary, border: `1px solid ${C.primary}40`, padding: "7px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 700 }}>
-                    <Icon name="edit" size={13} /> Editar
-                  </button>
+                  <button onClick={(e) => { e.stopPropagation(); handleSendWhatsApp(p); }} style={{ flex: 1, background: "rgba(37,211,102,0.15)", border: "1px solid #25D36640", color: "#25D366", borderRadius: 6, padding: "7px", cursor: "pointer", fontSize: 12, fontWeight: 700 }}><Icon name="phone" size={13} /> WhatsApp</button>
+                  <button onClick={(e) => { e.stopPropagation(); onEdit(p); }} style={{ flex: 1, background: `${C.primary}15`, color: C.primary, border: `1px solid ${C.primary}40`, padding: "7px", borderRadius: 6, cursor: "pointer", fontSize: 12, fontWeight: 700 }}><Icon name="edit" size={13} /> Editar</button>
                 </div>
               </div>
             );
           })}
         </div>
       ) : (
-        /* DESKTOP: tabla completa */
-        <>
-          <DataTable
-            rows={filtered}
-            onRowClick={onEdit}
-            empty={search
-              ? <div style={{ padding: 32, textAlign: "center", color: C.textDim, fontSize: 13 }}>Sin resultados para "<strong style={{ color: C.text }}>{search}</strong>"</div>
-              : <EmptyState
-                  title="Sin pacientes todavÃƒÂ­a"
-                  body="El bot los captura automÃƒÂ¡ticamente cuando llegan por WhatsApp. TambiÃƒÂ©n puedes agregar el primero manualmente."
-                  cta="+ Agregar paciente"
-                  onCta={onCreate}
-                  accent={C.primary}
-                />
-            }
-            columns={[
-              {
-                key: "paciente",
-                label: "Paciente",
-                width: "34%",
-                render: p => <CellIdentity name={p.nombre || "Sin nombre"} sub={formatRut(p.rut)} color={avatarColor(p.nombre || "")} />,
-              },
-              {
-                key: "contacto",
-                label: "Contacto",
-                render: p => (
-                  <div>
-                    <div style={{ fontSize: 13, color: C.text }}>{p.telefono || "â€”"}</div>
-                    <div style={{ fontSize: 11, color: C.textDim, marginTop: 2 }}>{formatVisit(p.fecha_ultima_visita)}</div>
-                  </div>
-                ),
-              },
-              {
-                key: "receta",
-                label: "Receta",
-                render: p => {
-                  const dias = p.fecha_ultima_visita
-                    ? Math.floor((Date.now() - new Date(p.fecha_ultima_visita).getTime()) / (1000 * 60 * 60 * 24))
-                    : null;
-                  const estado = dias === null ? "sin_datos" : dias > 365 ? "vencida" : dias > 335 ? "proxima" : "vigente";
-                  const estadoColor = estado === "vencida" ? C.red : estado === "proxima" ? C.amber : estado === "vigente" ? C.green : C.textMuted;
-                  const estadoLabel = estado === "vencida" ? `Vencida (${dias}d)` : estado === "proxima" ? `PrÃ³xima (${365 - dias}d)` : estado === "vigente" ? "Vigente" : "Sin receta";
-                  return <StatePill kind="recetaState" value={estado} size="sm" />;
-                },
-              },
-              {
-                key: "estado",
-                label: "Estado",
-                render: p => (
-                  <div>
-                    <StatePill kind="compraState" value={p.estado_compra || "Pendiente"} />
-                    {p.monto_venta && <div style={{ fontSize: 11, color: C.green, fontWeight: 700, marginTop: 2 }}>{formatCLP(p.monto_venta)}</div>}
-                  </div>
-                ),
-              },
-            ]}
-            rowActions={p => [
+        <DataTable
+          rows={filtered}
+          onRowClick={onEdit}
+          empty={search || filter
+            ? <div style={{ padding: 32, textAlign: "center", color: C.textDim, fontSize: 13 }}>Sin resultados para "<strong style={{ color: C.text }}>{search || filter}</strong>"</div>
+            : <EmptyState title="Sin pacientes todavia" body="El bot los captura automaticamente cuando llegan por WhatsApp. Tambien puedes agregar el primero manualmente." cta="+ Agregar paciente" onCta={onCreate} accent={C.primary} />
+          }
+          columns={[
+            { key: "paciente", label: "Paciente", width: "34%", render: p => <CellIdentity name={<HL text={p.nombre || "Sin nombre"} query={search} />} sub={<HL text={formatRut(p.rut)} query={search} />} color={avatarColor(p.nombre || "")} initialsFrom={p.nombre || ""} /> },
+            { key: "contacto", label: "Contacto", render: p => <div><div style={{ fontSize: 13, color: C.text }}><HL text={p.telefono || "-"} query={search} /></div><div style={{ fontSize: 11, color: C.textDim, marginTop: 2 }}>{formatVisit(p.fecha_ultima_visita)}</div></div> },
+            { key: "receta", label: "Receta", render: p => <StatePill kind="recetaState" value={recetaStateForPatient(p)} size="sm" /> },
+            { key: "estado", label: "Estado", render: p => <div><StatePill kind="compraState" value={p.estado_compra || "Pendiente"} />{p.monto_venta && <div style={{ fontSize: 11, color: C.green, fontWeight: 700, marginTop: 2 }}>{formatCLP(p.monto_venta)}</div>}</div> },
+          ]}
+          rowActions={p => [
             { icon: <Icon name="eye" size={14} />, label: "Ver ficha", color: C.primary, run: () => onEdit(p) },
             { icon: <Icon name="edit" size={14} />, label: "Editar", color: C.textDim, run: () => onEdit(p) },
             { icon: <Icon name="phone" size={14} />, label: "WhatsApp", color: "#25D366", run: () => handleSendWhatsApp(p) },
-            ]}
-            bulkActions={[
-              { label: "Exportar CSV", run: exportSelected },
-              { label: "Enviar recordatorio", run: ids => ids.map(id => filtered.find(p => p.id === id)).filter(Boolean).forEach(handleSendWhatsApp) },
-            ]}
-          />
-          <div style={{ display: "none", overflowX: "auto" }}>
-          <table style={{ width: "100%", borderCollapse: "collapse" }}>
-            <thead>
-              <tr style={{ background: `${C.surfaceL}80` }}>
-                {["Paciente", "Contacto", "Receta", "Estado", "Acciones"].map(h => (
-                  <th key={h} style={{ padding: "12px 16px", fontSize: 11, color: C.textMuted, fontWeight: 600, textTransform: "uppercase", textAlign: "left" }}>{h}</th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {filtered.length === 0 && (
-                <tr><td colSpan="5">
-                  {search
-                    ? <div style={{ padding: 32, textAlign: "center", color: C.textDim, fontSize: 13 }}>Sin resultados para "<strong style={{ color: C.text }}>{search}</strong>"</div>
-                    : <EmptyState
-                        title="Sin pacientes todavÃ­a"
-                        body="El bot los captura automÃ¡ticamente cuando llegan por WhatsApp. TambiÃ©n puedes agregar el primero manualmente."
-                        cta="+ Agregar paciente"
-                        onCta={onCreate}
-                        accent={C.primary}
-                      />
-                  }
-                </td></tr>
-              )}
-              {filtered.map(p => {
-                const dias = p.fecha_ultima_visita
-                  ? Math.floor((Date.now() - new Date(p.fecha_ultima_visita).getTime()) / (1000 * 60 * 60 * 24))
-                  : null;
-                const estado = dias === null ? "sin_datos" : dias > 365 ? "vencida" : dias > 335 ? "proxima" : "vigente";
-                const estadoColor = estado === "vencida" ? C.red : estado === "proxima" ? C.amber : estado === "vigente" ? C.green : C.textMuted;
-                const estadoLabel = estado === "vencida" ? `Vencida (${dias}d)` : estado === "proxima" ? `PrÃ³xima (${365 - dias}d)` : estado === "vigente" ? "Vigente" : "Sin receta";
-                return (
-                  <tr key={p.id} style={{ borderBottom: `1px solid ${C.border}`, cursor: "pointer" }}
-                    onClick={() => onEdit(p)}
-                    onMouseEnter={e => e.currentTarget.style.background = `${C.surfaceL}40`}
-                    onMouseLeave={e => e.currentTarget.style.background = "transparent"}
-                  >
-                    <td style={{ padding: "12px 16px" }}>
-                      <div style={{ fontWeight: 600, color: C.text, fontSize: 14 }}>{p.nombre || "Sin nombre"}</div>
-                      <div style={{ fontSize: 11, color: C.textDim, marginTop: 2 }}>{formatRut(p.rut)}</div>
-                    </td>
-                    <td style={{ padding: "12px 16px" }}>
-                      <div style={{ fontSize: 13, color: C.text }}>{p.telefono || "â€”"}</div>
-                      <div style={{ fontSize: 11, color: C.textDim, marginTop: 2 }}>{formatVisit(p.fecha_ultima_visita)}</div>
-                    </td>
-                    <td style={{ padding: "12px 16px" }}>
-                      <StatePill kind="recetaState" value={estado} size="sm" />
-                    </td>
-                    <td style={{ padding: "12px 16px" }}>
-                      <Pill
-                        label={p.estado_compra || "Pendiente"}
-                        color={p.estado_compra === "ComprÃ³" ? C.green : p.estado_compra === "No ComprÃ³" ? C.red : C.textMuted}
-                      />
-                      {p.monto_venta && <div style={{ fontSize: 11, color: C.green, fontWeight: 700, marginTop: 2 }}>{formatCLP(p.monto_venta)}</div>}
-                    </td>
-                    <td style={{ padding: "12px 16px", display: "flex", gap: 8 }}>
-                      <button onClick={(e) => { e.stopPropagation(); handleSendWhatsApp(p); }}
-                        style={{ background: "rgba(37, 211, 102, 0.15)", border: "1px solid #25D36640", color: "#25D366", borderRadius: 6, padding: "6px 10px", cursor: "pointer", fontSize: 11, fontWeight: 600 }}
-                      ><Icon name="phone" size={13} /> WhatsApp</button>
-                      <button onClick={(e) => { e.stopPropagation(); onEdit(p); }}
-                        style={{ background: `${C.primary}15`, color: C.primary, border: `1px solid ${C.primary}40`, padding: "6px 10px", borderRadius: 6, cursor: "pointer", fontSize: 11, fontWeight: 600 }}
-                      ><Icon name="edit" size={13} /> Editar</button>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-        </div>
-        </>
+          ]}
+          bulkActions={[
+            { label: "Exportar CSV", run: exportSelected },
+            { label: "Enviar recordatorio", run: ids => ids.map(id => filtered.find(p => p.id === id)).filter(Boolean).forEach(handleSendWhatsApp) },
+          ]}
+        />
       )}
     </Card>
   );
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// MODAL: NUEVA CITA MANUAL
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-function CitaModal({ opticaId, pacientes, onClose, refresh, initialDraft }) {
-  const today = new Date().toISOString().split("T")[0];
-  const [form, setForm] = useState({
-    nombre: "", telefono: "", servicio: "",
-    fecha: initialDraft?.fecha || today, hora: initialDraft?.hora || "10:00", notas: "",
-    estado: "confirmada",
-  });
-  const [saving, setSaving] = useState(false);
-  const [selectedPacienteId, setSelectedPacienteId] = useState("");
-
-  const handlePacienteSelect = (e) => {
-    const id = e.target.value;
-    setSelectedPacienteId(id);
-    if (id) {
-      const p = pacientes.find(p => String(p.id) === id);
-      if (p) setForm(prev => ({ ...prev, nombre: p.nombre || "", telefono: p.telefono || "" }));
-    }
-  };
-
-  const save = async () => {
-    if (!form.nombre) { alert("El nombre del paciente es obligatorio"); return; }
-    if (!form.fecha) { alert("La fecha es obligatoria"); return; }
-    setSaving(true);
-    const { error } = await supabase.from("citas").insert([{
-      optica_id: opticaId,
-      paciente_id: selectedPacienteId || null,
-      nombre: form.nombre,
-      telefono: form.telefono,
-      servicio: form.servicio,
-      fecha: form.fecha,
-      hora: form.hora,
-      notas: form.notas,
-      estado: form.estado,
-      origen: "manual",
-    }]);
-    setSaving(false);
-    if (error) { alert("Error al guardar: " + error.message); }
-    else { refresh(); onClose(); }
-  };
-
-  return (
-    <Modal
-      open
-      onClose={onClose}
-      title="Nueva Cita Manual"
-      subtitle="Agenda una cita manual o completa datos desde un paciente existente."
-      icon={<Icon name="calendar" size={16} />}
-      size="md"
-      footer={(
-        <>
-          <button onClick={onClose}
-            style={{ background: "transparent", color: C.text, border: `1px solid ${C.border}`, padding: "10px 18px", borderRadius: 8, cursor: "pointer", fontSize: 13 }}>
-            Cancelar
-          </button>
-          <button onClick={save} disabled={saving}
-            style={{ background: C.primary, color: "#000", border: "none", padding: "10px 22px", borderRadius: 8, cursor: saving ? "default" : "pointer", fontSize: 13, fontWeight: 700, opacity: saving ? 0.6 : 1 }}>
-            {saving ? "Guardando..." : <><Icon name="calendar" size={14} /> Agendar Cita</>}
-          </button>
-        </>
-      )}
-    >
-        <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-          {pacientes.length > 0 && (
-            <div>
-              <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: C.textDim, textTransform: "uppercase", marginBottom: 6 }}>
-                Paciente existente (opcional)
-              </label>
-              <select value={selectedPacienteId} onChange={handlePacienteSelect}
-                style={{ width: "100%", background: C.bg, border: `1px solid ${C.border}`, color: selectedPacienteId ? C.text : C.textMuted, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13 }}>
-                <option value="">â€” O ingresar nombre manualmente abajo â€”</option>
-                {pacientes.map(p => (
-                  <option key={p.id} value={String(p.id)}>{p.nombre}{p.rut ? ` · ${formatRut(p.rut)}` : ""}</option>
-                ))}
-              </select>
-            </div>
-          )}
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(180px, 1fr))", gap: 10 }}>
-            <input placeholder="Nombre del paciente *" value={form.nombre} onChange={e => setForm({ ...form, nombre: e.target.value })}
-              style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13 }} />
-            <input placeholder="+569..." value={form.telefono} onChange={e => setForm({ ...form, telefono: e.target.value })}
-              style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13 }} />
-          </div>
-
-          <input placeholder="Servicio (ej: Examen visual, Lentes de contacto...)" value={form.servicio} onChange={e => setForm({ ...form, servicio: e.target.value })}
-            style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13 }} />
-
-          <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(150px, 1fr))", gap: 10 }}>
-            <div>
-              <div style={{ fontSize: 10, color: C.textDim, marginBottom: 4, textTransform: "uppercase", fontWeight: 700 }}>Fecha *</div>
-              <input type="date" value={form.fecha} onChange={e => setForm({ ...form, fecha: e.target.value })}
-                style={{ width: "100%", background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13 }} />
-            </div>
-            <div>
-              <div style={{ fontSize: 10, color: C.textDim, marginBottom: 4, textTransform: "uppercase", fontWeight: 700 }}>Hora</div>
-              <input type="time" value={form.hora} onChange={e => setForm({ ...form, hora: e.target.value })}
-                style={{ width: "100%", background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13 }} />
-            </div>
-          </div>
-
-          <div>
-            <label style={{ display: "block", fontSize: 11, fontWeight: 600, color: C.textDim, textTransform: "uppercase", marginBottom: 6 }}>Estado</label>
-            <select value={form.estado} onChange={e => setForm({ ...form, estado: e.target.value })}
-              style={{ width: "100%", background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13 }}>
-              <option value="confirmada">Confirmada</option>
-              <option value="pendiente_confirmacion">Pendiente confirmaciÃ³n</option>
-            </select>
-          </div>
-
-          <textarea placeholder="Notas adicionales" rows={2} value={form.notas} onChange={e => setForm({ ...form, notas: e.target.value })}
-            style={{ background: C.bg, border: `1px solid ${C.border}`, color: C.text, padding: "10px 14px", borderRadius: 8, outline: "none", fontSize: 13, fontFamily: "inherit", resize: "none" }} />
-        </div>
-
-    </Modal>
-  );
-}
-
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 // TAB: CITAS â€” tabla en desktop, tarjetas en mobile
 // â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 function TabCitas({ citas, refresh, optica, pacientes, onCreateCita }) {
@@ -2122,6 +1985,8 @@ function TabCitas({ citas, refresh, optica, pacientes, onCreateCita }) {
   const [view, setView] = useState("dia");
   const [selectedDate, setSelectedDate] = useState(() => dateFromISO(new Date().toISOString().split("T")[0]));
   const [cancelRequest, setCancelRequest] = useState(null);
+  const [search, setSearch] = useState("");
+  const [filter, setFilter] = useState(null);
 
   const updateCita = async (id, estado) => {
     await supabase.from("citas").update({ estado }).eq("id", id);
@@ -2131,9 +1996,7 @@ function TabCitas({ citas, refresh, optica, pacientes, onCreateCita }) {
   const requestCancelCita = (target) => {
     const ids = Array.isArray(target) ? target : [target.id];
     const selected = citas.filter(c => ids.includes(c.id));
-    const label = selected.length === 1
-      ? selected[0].nombre || `Cita #${selected[0].id}`
-      : `${ids.length} citas seleccionadas`;
+    const label = selected.length === 1 ? selected[0].nombre || `Cita #${selected[0].id}` : `${ids.length} citas seleccionadas`;
     setCancelRequest({ ids, label, count: ids.length });
   };
 
@@ -2144,7 +2007,6 @@ function TabCitas({ citas, refresh, optica, pacientes, onCreateCita }) {
     refresh();
   };
 
-  const pendientes = citas.filter(c => c.estado === "pendiente_confirmacion").length;
   const selectedDateISO = formatDateInput(selectedDate);
   const shiftDate = (days) => setSelectedDate(prev => {
     const next = new Date(prev);
@@ -2152,274 +2014,140 @@ function TabCitas({ citas, refresh, optica, pacientes, onCreateCita }) {
     return next;
   });
 
+  const citaMatchesFilter = (c, f) => !f || c.estado === f || c.origen === f;
+  const filteredCitas = citas.filter(c =>
+    hasQueryMatch([c.nombre, c.rut, formatRut(c.rut), c.telefono, c.servicio, c.fecha, c.hora, labelMeta("citaState", c.estado).label], search) &&
+    citaMatchesFilter(c, filter)
+  );
+  const countBy = (predicate) => citas.filter(predicate).length;
+  const pendientes = countBy(c => c.estado === "pendiente_confirmacion");
+
+  const exportSelected = (ids) => {
+    const picked = filteredCitas.filter(c => ids.includes(c.id));
+    const header = ["Paciente", "Telefono", "Servicio", "Fecha", "Hora", "Origen", "Estado"];
+    const lines = picked.map(c => [
+      c.nombre || "",
+      c.telefono || "",
+      c.servicio || "",
+      c.fecha || "",
+      c.hora || "",
+      labelMeta("citaOrigin", c.origen).label,
+      labelMeta("citaState", c.estado).label,
+    ].map(v => `"${String(v).replace(/"/g, '""')}"`).join(","));
+    const blob = new Blob([[header.join(","), ...lines].join("\n")], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "citas-auken.csv";
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
   return (
     <>
       <Card style={{ padding: 0 }}>
-        <div style={{
-          padding: "16px 20px", borderBottom: `1px solid ${C.border}`,
-          display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 10,
-        }}>
-          <div>
-            <div style={{ fontSize: 16, fontWeight: 600, color: C.text }}>Agenda de Citas</div>
-            <div style={{ fontSize: 12, color: C.textDim, marginTop: 2 }}>
-              {pendientes > 0
-                ? <span style={{ color: C.amber, fontWeight: 600 }}>â³ {pendientes} pendientes de confirmar</span>
-                : `${citas.length} citas totales`}
+        <TableToolbar
+          title="Agenda de Citas"
+          subtitle={pendientes ? `${pendientes} pendientes` : "totales"}
+          count={`${filteredCitas.length} de ${citas.length}`}
+          search={search}
+          onSearch={setSearch}
+          filters={[
+            { id: "pendiente_confirmacion", label: "Por confirmar", count: countBy(c => c.estado === "pendiente_confirmacion") },
+            { id: "confirmada", label: "Confirmadas", count: countBy(c => c.estado === "confirmada") },
+            { id: "completada", label: "Completadas", count: countBy(c => c.estado === "completada") },
+            { id: "cancelada", label: "Canceladas", count: countBy(c => c.estado === "cancelada") },
+            { id: "bot-ia", label: "Auken IA", count: countBy(c => c.origen === "bot-ia") },
+          ]}
+          activeFilter={filter}
+          onFilter={setFilter}
+          primaryAction={{ label: "Nueva cita", run: () => onCreateCita({ fecha: selectedDateISO, hora: "10:00" }) }}
+          secondaryActions={[{ icon: <Icon name="file" size={12} />, label: "Exportar CSV", run: () => exportSelected(filteredCitas.map(c => c.id)) }]}
+        />
+
+        {!isMobile && (
+          <div style={{ padding: "10px 18px", borderBottom: `1px solid ${C.border}`, background: C.bg, display: "flex", justifyContent: "space-between", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <div style={{ display: "flex", gap: 4, padding: 3, background: C.surface, borderRadius: 8, border: `1px solid ${C.border}` }}>
+              {[["dia", "Dia"], ["semana", "Semana"], ["lista", "Lista"]].map(([key, label]) => (
+                <button key={key} onClick={() => setView(key)} style={{ height: 26, padding: "0 10px", borderRadius: 5, background: view === key ? C.surfaceL : "transparent", color: view === key ? C.text : C.textDim, border: "none", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>{label}</button>
+              ))}
+            </div>
+            <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+              <button onClick={() => shiftDate(-1)} style={{ width: 28, height: 28, borderRadius: 6, background: C.surface, border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer" }}>?</button>
+              <input type="date" value={selectedDateISO} onChange={e => setSelectedDate(dateFromISO(e.target.value))} style={{ height: 28, background: C.surface, border: `1px solid ${C.border}`, color: C.text, borderRadius: 6, padding: "0 8px", fontSize: 12 }} />
+              <button onClick={() => shiftDate(1)} style={{ width: 28, height: 28, borderRadius: 6, background: C.surface, border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer" }}>?</button>
             </div>
           </div>
-          <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
-            {!isMobile && (
-              <>
-                <div style={{ display: "flex", gap: 4, padding: 3, background: C.bg, borderRadius: 8, border: `1px solid ${C.border}` }}>
-                  {[["dia", "DÃ­a"], ["semana", "Semana"], ["lista", "Lista"]].map(([key, label]) => (
-                    <button key={key} onClick={() => setView(key)}
-                      style={{ height: 26, padding: "0 10px", borderRadius: 5, background: view === key ? C.surfaceL : "transparent", color: view === key ? C.text : C.textDim, border: "none", fontSize: 11, fontWeight: 600, cursor: "pointer" }}>
-                      {label}
-                    </button>
-                  ))}
-                </div>
-                <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                  <button onClick={() => shiftDate(-1)} style={{ width: 28, height: 28, borderRadius: 6, background: C.bg, border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer" }}>â€¹</button>
-                  <input type="date" value={selectedDateISO} onChange={e => setSelectedDate(dateFromISO(e.target.value))}
-                    style={{ height: 28, background: C.bg, border: `1px solid ${C.border}`, color: C.text, borderRadius: 6, padding: "0 8px", fontSize: 12 }} />
-                  <button onClick={() => shiftDate(1)} style={{ width: 28, height: 28, borderRadius: 6, background: C.bg, border: `1px solid ${C.border}`, color: C.textDim, cursor: "pointer" }}>â€º</button>
-                </div>
-              </>
-            )}
-            <button
-              onClick={() => onCreateCita({ fecha: selectedDateISO, hora: "10:00" })}
-              style={{ background: C.primary, color: "#000", border: "none", borderRadius: 6, padding: "8px 16px", fontSize: 13, fontWeight: 700, cursor: "pointer", whiteSpace: "nowrap" }}
-            >
-              + Nueva Cita
-            </button>
-          </div>
-        </div>
+        )}
 
-        {/* MOBILE: tarjetas */}
         {isMobile ? (
           <div style={{ padding: 12, display: "flex", flexDirection: "column", gap: 10 }}>
-            {citas.length === 0 && (
-              <EmptyState
-                title="Agenda limpia"
-                body="El bot agenda automÃ¡ticamente cuando conversa con un paciente. TambiÃ©n puedes crear una cita manualmente."
-                cta="+ Nueva Cita"
-                onCta={() => onCreateCita({ fecha: selectedDateISO, hora: "10:00" })}
-                accent={C.blue}
-              />
+            {filteredCitas.length === 0 && (
+              search || filter
+                ? <div style={{ padding: 24, textAlign: "center", color: C.textDim, fontSize: 13 }}>Sin resultados para "<strong style={{ color: C.text }}>{search || filter}</strong>"</div>
+                : <EmptyState title="Agenda limpia" body="El bot agenda automaticamente cuando conversa con un paciente. Tambien puedes crear una cita manualmente." cta="+ Nueva Cita" onCta={() => onCreateCita({ fecha: selectedDateISO, hora: "10:00" })} accent={C.blue} />
             )}
-            {citas.map(c => {
-              const estadoColor = c.estado === "confirmada" ? C.green
-                : c.estado === "cancelada" ? C.red
-                : c.estado === "completada" ? C.blue : C.amber;
+            {filteredCitas.map(c => {
+              const estadoColor = c.estado === "confirmada" ? C.green : c.estado === "cancelada" ? C.red : c.estado === "completada" ? C.blue : C.amber;
               const isBot = c.origen === "bot-ia";
               const calLink = c.fecha ? buildCalLinkForCita(c, optica) : null;
               return (
-                <div key={c.id} style={{
-                  background: C.bg,
-                  border: `1px solid ${isBot ? "#A78BFA40" : C.border}`,
-                  borderLeft: `3px solid ${estadoColor}`,
-                  borderRadius: 10, padding: "12px 14px",
-                }}>
+                <div key={c.id} style={{ background: C.bg, border: `1px solid ${isBot ? "#A78BFA40" : C.border}`, borderLeft: `3px solid ${estadoColor}`, borderRadius: 10, padding: "12px 14px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-                    <div>
-                      <div style={{ fontWeight: 700, color: C.text, fontSize: 14 }}>{c.nombre || "â€”"}</div>
-                      <div style={{ fontSize: 12, color: C.textDim, marginTop: 2 }}>{c.servicio || "â€”"}</div>
+                    <div style={{ minWidth: 0 }}>
+                      <div style={{ fontWeight: 700, color: C.text, fontSize: 14 }}><HL text={c.nombre || "-"} query={search} /></div>
+                      <div style={{ fontSize: 12, color: C.textDim, marginTop: 2 }}><HL text={c.servicio || "-"} query={search} /></div>
                     </div>
                     <div style={{ textAlign: "right", flexShrink: 0 }}>
-                      <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}>{c.fecha || "â€”"}</div>
+                      <div style={{ fontSize: 13, fontWeight: 700, color: C.text }}><HL text={c.fecha || "-"} query={search} /></div>
                       {c.hora && <div style={{ fontSize: 12, color: C.textDim }}>{c.hora}</div>}
                     </div>
                   </div>
                   <div style={{ display: "flex", gap: 6, marginTop: 10, flexWrap: "wrap", alignItems: "center" }}>
                     <StatePill kind="citaState" value={c.estado} size="sm" />
                     {isBot && <Pill label={<><Icon name="bot" size={12} /> IA</>} color="#A78BFA" />}
-                    {calLink && (
-                      <a href={calLink} target="_blank" rel="noopener noreferrer"
-                        style={{ fontSize: 11, color: "#7DD3FC", textDecoration: "none", fontWeight: 700, background: "rgba(66,133,244,0.15)", padding: "4px 10px", borderRadius: 4, border: "1px solid rgba(66,133,244,0.4)" }}>
-                        <Icon name="calendar" size={12} /> Google Calendar
-                      </a>
-                    )}
-                    {c.estado === "pendiente_confirmacion" && (
-                      <button onClick={() => updateCita(c.id, "confirmada")}
-                        style={{ background: `${C.green}20`, color: C.green, border: `1px solid ${C.green}40`, padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>
-                        <Icon name="check" size={12} /> Confirmar
-                      </button>
-                    )}
-                    {c.estado !== "cancelada" && (
-                      <button onClick={() => requestCancelCita(c)}
-                        style={{ background: `${C.red}15`, color: C.red, border: `1px solid ${C.red}30`, padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11 }}>
-                        Cancelar
-                      </button>
-                    )}
+                    {calLink && <a href={calLink} target="_blank" rel="noopener noreferrer" style={{ fontSize: 11, color: "#7DD3FC", textDecoration: "none", fontWeight: 700, background: "rgba(66,133,244,0.15)", padding: "4px 10px", borderRadius: 4, border: "1px solid rgba(66,133,244,0.4)" }}><Icon name="calendar" size={12} /> Google Calendar</a>}
+                    {c.estado === "pendiente_confirmacion" && <button onClick={() => updateCita(c.id, "confirmada")} style={{ background: `${C.green}20`, color: C.green, border: `1px solid ${C.green}40`, padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11, fontWeight: 700 }}><Icon name="check" size={12} /> Confirmar</button>}
+                    {c.estado !== "cancelada" && <button onClick={() => requestCancelCita(c)} style={{ background: `${C.red}15`, color: C.red, border: `1px solid ${C.red}30`, padding: "4px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11 }}>Cancelar</button>}
                   </div>
                 </div>
               );
             })}
           </div>
-      ) : (
-        /* DESKTOP: tabla completa */
+        ) : (
           <>
-          {view === "dia" && (
-            <DayTimeline
-              date={selectedDate}
-              citas={citas}
-              onSlotClick={onCreateCita}
-              onCitaClick={(c) => {
-                const calLink = c.fecha ? buildCalLinkForCita(c, optica) : null;
-                if (calLink) window.open(calLink, "_blank", "noopener,noreferrer");
-              }}
-            />
-          )}
-          {view === "semana" && (
-            <WeekAgenda
-              date={selectedDate}
-              citas={citas}
-              onSlotClick={onCreateCita}
-              onCitaClick={(c) => {
-                const calLink = c.fecha ? buildCalLinkForCita(c, optica) : null;
-                if (calLink) window.open(calLink, "_blank", "noopener,noreferrer");
-              }}
-            />
-          )}
-          {view === "lista" && (
-          <DataTable
-            rows={citas}
-            empty={
-              <EmptyState
-                title="Agenda limpia"
-                body="El bot agenda automÃƒÂ¡ticamente. TambiÃƒÂ©n puedes crear una cita manualmente con el botÃƒÂ³n superior."
-                cta="+ Nueva Cita"
-                onCta={() => onCreateCita({ fecha: selectedDateISO, hora: "10:00" })}
-                accent={C.blue}
+            {view === "dia" && <DayTimeline date={selectedDate} citas={filteredCitas} onSlotClick={onCreateCita} onCitaClick={(c) => { const calLink = c.fecha ? buildCalLinkForCita(c, optica) : null; if (calLink) window.open(calLink, "_blank", "noopener,noreferrer"); }} />}
+            {view === "semana" && <WeekAgenda date={selectedDate} citas={filteredCitas} onSlotClick={onCreateCita} onCitaClick={(c) => { const calLink = c.fecha ? buildCalLinkForCita(c, optica) : null; if (calLink) window.open(calLink, "_blank", "noopener,noreferrer"); }} />}
+            {view === "lista" && (
+              <DataTable
+                rows={filteredCitas}
+                empty={search || filter
+                  ? <div style={{ padding: 32, textAlign: "center", color: C.textDim, fontSize: 13 }}>Sin resultados para "<strong style={{ color: C.text }}>{search || filter}</strong>"</div>
+                  : <EmptyState title="Agenda limpia" body="El bot agenda automaticamente. Tambien puedes crear una cita manualmente con el boton superior." cta="+ Nueva Cita" onCta={() => onCreateCita({ fecha: selectedDateISO, hora: "10:00" })} accent={C.blue} />
+                }
+                columns={[
+                  { key: "paciente", label: "Paciente", width: "28%", render: c => <CellIdentity name={<HL text={c.nombre || `Paciente #${c.paciente_id}`} query={search} />} sub={<HL text={c.telefono || formatRut(c.rut)} query={search} />} color={avatarColor(c.nombre || "")} initialsFrom={c.nombre || ""} /> },
+                  { key: "servicio", label: "Servicio", render: c => <HL text={c.servicio || "-"} query={search} /> },
+                  { key: "fecha", label: "Fecha y hora", nowrap: true, mono: true, render: c => <HL text={formatCitaDate(c.fecha, c.hora)} query={search} /> },
+                  { key: "origen", label: "Origen", render: c => <StatePill kind="citaOrigin" value={c.origen} /> },
+                  { key: "estado", label: "Estado", render: c => <StatePill kind="citaState" value={c.estado} size="sm" /> },
+                  { key: "calendar", label: "Calendar", render: c => { const calLink = c.fecha ? buildCalLinkForCita(c, optica) : null; if (!calLink) return <span style={{ color: C.textMuted }}>-</span>; return <a href={calLink} target="_blank" rel="noopener noreferrer" onClick={e => e.stopPropagation()} style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 28, padding: "0 10px", borderRadius: 6, background: "rgba(66,133,244,0.15)", color: "#7DD3FC", border: "1px solid rgba(66,133,244,0.4)", fontSize: 11, fontWeight: 700, textDecoration: "none" }}><Icon name="calendar" size={12} /> Google</a>; } },
+                ]}
+                rowActions={c => {
+                  const calLink = c.fecha ? buildCalLinkForCita(c, optica) : null;
+                  return [
+                    ...(calLink ? [{ icon: <Icon name="calendar" size={14} />, label: "Agregar a Google Calendar", color: "#7DD3FC", run: () => window.open(calLink, "_blank", "noopener,noreferrer") }] : []),
+                    ...(c.estado === "pendiente_confirmacion" ? [{ icon: <Icon name="check" size={14} />, label: "Confirmar", color: C.green, run: () => updateCita(c.id, "confirmada") }] : []),
+                    ...(c.estado !== "cancelada" ? [{ icon: <Icon name="x" size={14} />, label: "Cancelar", color: C.red, run: () => requestCancelCita(c) }] : []),
+                  ];
+                }}
+                bulkActions={[
+                  { label: "Confirmar", run: ids => ids.forEach(id => updateCita(id, "confirmada")) },
+                  { label: "Cancelar", run: requestCancelCita },
+                  { label: "Exportar CSV", run: exportSelected },
+                ]}
               />
-            }
-            columns={[
-              {
-                key: "paciente",
-                label: "Paciente",
-                width: "28%",
-                render: c => <CellIdentity name={c.nombre || `Paciente #${c.paciente_id}`} sub={c.telefono || formatRut(c.rut)} color={avatarColor(c.nombre || "")} />,
-              },
-              { key: "servicio", label: "Servicio", render: c => c.servicio || "â€”" },
-              {
-                key: "fecha",
-                label: "Fecha y hora",
-                nowrap: true,
-                mono: true,
-                render: c => <span>{formatCitaDate(c.fecha, c.hora)}</span>,
-              },
-              {
-                key: "origen",
-                label: "Origen",
-                render: c => <StatePill kind="citaOrigin" value={c.origen} />,
-              },
-              {
-                key: "estado",
-                label: "Estado",
-                render: c => <StatePill kind="citaState" value={c.estado} size="sm" />,
-              },
-              {
-                key: "calendar",
-                label: "Calendar",
-                render: c => {
-                  const calLink = c.fecha ? buildCalLinkForCita(c, optica) : null;
-                  if (!calLink) return <span style={{ color: C.textMuted }}>â€”</span>;
-                  return (
-                    <a href={calLink} target="_blank" rel="noopener noreferrer"
-                      onClick={e => e.stopPropagation()}
-                      style={{ display: "inline-flex", alignItems: "center", gap: 6, height: 28, padding: "0 10px", borderRadius: 6, background: "rgba(66,133,244,0.15)", color: "#7DD3FC", border: "1px solid rgba(66,133,244,0.4)", fontSize: 11, fontWeight: 700, textDecoration: "none" }}>
-                      <Icon name="calendar" size={12} /> Google
-                    </a>
-                  );
-                },
-              },
-            ]}
-            rowActions={c => {
-              const calLink = c.fecha ? buildCalLinkForCita(c, optica) : null;
-              return [
-                ...(calLink ? [{ icon: <Icon name="calendar" size={14} />, label: "Agregar a Google Calendar", color: "#7DD3FC", run: () => window.open(calLink, "_blank", "noopener,noreferrer") }] : []),
-                ...(c.estado === "pendiente_confirmacion" ? [{ icon: <Icon name="check" size={14} />, label: "Confirmar", color: C.green, run: () => updateCita(c.id, "confirmada") }] : []),
-                ...(c.estado !== "cancelada" ? [{ icon: <Icon name="x" size={14} />, label: "Cancelar", color: C.red, run: () => requestCancelCita(c) }] : []),
-              ];
-            }}
-            bulkActions={[
-              { label: "Confirmar", run: ids => ids.forEach(id => updateCita(id, "confirmada")) },
-              { label: "Cancelar", run: requestCancelCita },
-            ]}
-          />
-          )}
-          <div style={{ display: "none", overflowX: "auto" }}>
-            <table style={{ width: "100%", borderCollapse: "collapse" }}>
-              <thead>
-                <tr style={{ background: `${C.surfaceL}80` }}>
-                  {["Paciente", "Servicio", "Fecha y hora", "Origen", "Estado", "Acciones"].map(h => (
-                    <th key={h} style={{ padding: "12px 16px", fontSize: 11, color: C.textMuted, fontWeight: 600, textTransform: "uppercase", textAlign: "left" }}>{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody>
-                {citas.length === 0 && (
-                  <tr><td colSpan="6">
-                    <EmptyState
-                      title="Agenda limpia"
-                      body="El bot agenda automÃ¡ticamente. TambiÃ©n puedes crear una cita manualmente con el botÃ³n superior."
-                      cta="+ Nueva Cita"
-                      onCta={() => onCreateCita({ fecha: selectedDateISO, hora: "10:00" })}
-                      accent={C.blue}
-                    />
-                  </td></tr>
-                )}
-                {citas.map(c => {
-                  const estadoColor = c.estado === "confirmada" ? C.green
-                    : c.estado === "cancelada" ? C.red
-                    : c.estado === "completada" ? C.blue : C.amber;
-                  const isBot = c.origen === "bot-ia";
-                  const origenColor = isBot ? "#A78BFA" : C.blue;
-                  const origenLabel = isBot ? "IA" : (c.origen || "manual");
-                  const calLink = c.fecha ? buildCalLinkForCita(c, optica) : null;
-
-                  return (
-                    <tr key={c.id} style={{
-                      borderBottom: `1px solid ${C.border}`,
-                      background: isBot ? "rgba(167,139,250,0.04)" : "transparent",
-                    }}>
-                      <td style={{ padding: "12px 16px" }}>
-                        <div style={{ fontWeight: 600, color: C.text, fontSize: 13 }}>{c.nombre || `Paciente #${c.paciente_id}`}</div>
-                        {c.telefono && <div style={{ fontSize: 11, color: C.textDim }}>{c.telefono}</div>}
-                      </td>
-                      <td style={{ padding: "12px 16px", fontSize: 13, color: C.text }}>{c.servicio || "â€”"}</td>
-                      <td style={{ padding: "12px 16px", fontSize: 13, color: C.text }}>{c.fecha} {c.hora && `Â· ${c.hora}`}</td>
-                      <td style={{ padding: "12px 16px" }}><StatePill kind="citaOrigin" value={c.origen} size="sm" /></td>
-                      <td style={{ padding: "12px 16px" }}><StatePill kind="citaState" value={c.estado} size="sm" /></td>
-                      <td style={{ padding: "12px 16px" }}>
-                        <div style={{ display: "flex", gap: 6, flexWrap: "wrap" }}>
-                          {calLink && (
-                            <a href={calLink} target="_blank" rel="noopener noreferrer"
-                              title="Agregar a Google Calendar"
-                              style={{ background: "rgba(66,133,244,0.15)", color: "#7DD3FC", border: "1px solid rgba(66,133,244,0.4)", padding: "5px 10px", borderRadius: 4, fontSize: 11, fontWeight: 700, textDecoration: "none" }}>
-                              <Icon name="calendar" size={12} /> Calendar
-                            </a>
-                          )}
-                          {c.estado === "pendiente_confirmacion" && (
-                            <button onClick={() => updateCita(c.id, "confirmada")}
-                              style={{ background: `${C.green}20`, color: C.green, border: `1px solid ${C.green}40`, padding: "5px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11, fontWeight: 700 }}>
-                              âœ“ Confirmar
-                            </button>
-                          )}
-                          {c.estado !== "cancelada" && (
-                            <button onClick={() => requestCancelCita(c)}
-                              style={{ background: `${C.red}20`, color: C.red, border: `1px solid ${C.red}40`, padding: "5px 10px", borderRadius: 4, cursor: "pointer", fontSize: 11 }}>
-                              Cancelar
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    </tr>
-                  );
-                })}
-              </tbody>
-            </table>
-          </div>
+            )}
           </>
         )}
       </Card>
@@ -2442,9 +2170,6 @@ function TabCitas({ citas, refresh, optica, pacientes, onCreateCita }) {
   );
 }
 
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
-// TAB: CONFIGURACIÃ“N â€” con dirty-state para no perder cambios
-// â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
 const SERVICE_PRESETS = [
   "Examen visual computarizado",
   "Examen visual oftalmologico",
