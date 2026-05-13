@@ -2,6 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import ConfirmDialog from "../components/ConfirmDialog";
+import Icon from "../components/Icon";
 
 // ── PALETA ZEN / WAR ROOM ──────────────────────────────────────────────
 const Z = {
@@ -61,6 +62,111 @@ function KPIZen({ label, value, color, icon, glow }) {
         lineHeight: 1 
       }}>
         {value}
+      </div>
+    </Card>
+  );
+}
+
+function clp(n) {
+  return "$" + Number(n || 0).toLocaleString("es-CL");
+}
+
+function monthKey(date) {
+  return date.toISOString().slice(0, 7);
+}
+
+function buildMrrSeries(opticas) {
+  const now = new Date();
+  const months = Array.from({ length: 6 }, (_, idx) => {
+    const d = new Date(now.getFullYear(), now.getMonth() - (5 - idx), 1);
+    return monthKey(d);
+  });
+  return months.map(key => opticas.reduce((sum, o) => {
+    const created = o.created_at ? monthKey(new Date(o.created_at)) : months[0];
+    const monthly = Number(o.config?.mensualidad || 0);
+    return o.status === "active" && created <= key ? sum + monthly : sum;
+  }, 0));
+}
+
+function buildPlanBreakdown(opticas) {
+  const colors = [Z.primary, Z.neon, Z.green, Z.amber, "#A78BFA"];
+  const map = new Map();
+  opticas.filter(o => o.status === "active").forEach(o => {
+    const name = o.plan_type || "Sin plan";
+    const current = map.get(name) || { name, count: 0, mrr: 0, color: colors[map.size % colors.length] };
+    current.count += 1;
+    current.mrr += Number(o.config?.mensualidad || 0);
+    map.set(name, current);
+  });
+  return Array.from(map.values());
+}
+
+function MrrHeroCard({ mrr, mrrPrev, series, payingOpticas, plans, churnPct, onDrill }) {
+  const delta = mrrPrev ? ((mrr - mrrPrev) / mrrPrev) * 100 : 0;
+  const up = delta >= 0;
+  const arr = mrr * 12;
+  const arpu = payingOpticas > 0 ? mrr / payingOpticas : 0;
+  const W = 220;
+  const H = 56;
+  const cleanSeries = series?.length ? series : [mrr];
+  const max = Math.max(...cleanSeries, 1);
+  const min = Math.min(...cleanSeries, 0);
+  const pts = cleanSeries.map((v, i) => [
+    cleanSeries.length > 1 ? (i / (cleanSeries.length - 1)) * W : W,
+    H - ((v - min) / (max - min || 1)) * (H - 8) - 4,
+  ]);
+  const path = pts.map((p, i) => `${i === 0 ? "M" : "L"}${p[0]},${p[1]}`).join(" ");
+  const area = `${path} L${W},${H} L0,${H} Z`;
+  const planTotal = Math.max(mrr, 1);
+
+  return (
+    <Card accent={Z.green} glow style={{ padding: 0, overflow: "hidden", marginBottom: 18 }}>
+      <div style={{ background: `linear-gradient(180deg, ${Z.surface} 0%, ${Z.bgDeep} 100%)`, padding: "20px 22px", display: "grid", gridTemplateColumns: "minmax(0, 1fr) auto", gap: 24, position: "relative", overflow: "hidden" }}>
+        <div aria-hidden style={{ position: "absolute", top: -80, right: -80, width: 280, height: 280, background: "radial-gradient(circle, rgba(16,185,129,0.12) 0%, transparent 70%)", pointerEvents: "none" }} />
+        <div style={{ display: "flex", flexDirection: "column", gap: 14, minWidth: 0, position: "relative" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.10em", textTransform: "uppercase", color: Z.inkFaint }}>MRR Total / {new Date().toLocaleDateString("es-CL", { month: "long", year: "numeric" })}</span>
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 3, height: 20, padding: "0 7px", borderRadius: 5, background: up ? "rgba(16,185,129,0.10)" : "rgba(239,68,68,0.10)", color: up ? Z.green : Z.red, border: `1px solid ${up ? "rgba(16,185,129,0.24)" : "rgba(239,68,68,0.24)"}`, fontSize: 11, fontWeight: 700, fontFamily: "'IBM Plex Mono', monospace", fontVariantNumeric: "tabular-nums" }}>
+              <span style={{ fontSize: 9 }}>{up ? "+" : "-"}</span>{Math.abs(delta).toFixed(1)}%
+            </span>
+            <span style={{ fontSize: 11, color: Z.inkMid, fontFamily: "'IBM Plex Mono', monospace" }}>vs {clp(mrrPrev)}</span>
+          </div>
+          <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 48, fontWeight: 700, color: Z.ink, letterSpacing: "-0.04em", fontVariantNumeric: "tabular-nums", lineHeight: 1 }}>{clp(mrr)}</span>
+          <div style={{ display: "flex", gap: 28, flexWrap: "wrap" }}>
+            {[
+              { l: "ARR proyectado", v: clp(arr), c: Z.ink },
+              { l: "ARPU", v: clp(Math.round(arpu)), c: Z.ink },
+              { l: "Opticas pagando", v: payingOpticas, c: Z.green },
+              { l: "Churn proxy", v: `${churnPct.toFixed(1)}%`, c: churnPct > 5 ? Z.red : Z.inkMid },
+            ].map(s => (
+              <div key={s.l} style={{ display: "flex", flexDirection: "column", gap: 2 }}>
+                <span style={{ fontSize: 10, color: Z.inkFaint, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>{s.l}</span>
+                <span style={{ fontFamily: "'IBM Plex Mono', monospace", fontSize: 14, fontWeight: 700, color: s.c, fontVariantNumeric: "tabular-nums" }}>{s.v}</span>
+              </div>
+            ))}
+          </div>
+          <div style={{ display: "flex", flexDirection: "column", gap: 6, marginTop: 4 }}>
+            <span style={{ fontSize: 10, color: Z.inkFaint, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase" }}>Distribucion por plan</span>
+            <div style={{ display: "flex", height: 7, borderRadius: 4, overflow: "hidden", border: `1px solid ${Z.border}`, background: Z.bgDeep }}>
+              {(plans.length ? plans : [{ name: "Sin MRR", count: 0, mrr: 0, color: Z.inkFaint }]).map(p => (
+                <div key={p.name} title={`${p.name}: ${clp(p.mrr)}`} style={{ flexBasis: `${Math.max(0, (p.mrr / planTotal) * 100)}%`, minWidth: p.mrr ? 2 : 0, background: p.color, transition: "flex-basis 400ms cubic-bezier(0.16,1,0.3,1)" }} />
+              ))}
+            </div>
+            <div style={{ display: "flex", gap: 14, flexWrap: "wrap" }}>
+              {plans.map(p => <span key={p.name} style={{ display: "inline-flex", alignItems: "center", gap: 5, fontSize: 11, color: Z.inkMid }}><span style={{ width: 8, height: 8, borderRadius: 2, background: p.color }} />{p.name} <span style={{ color: Z.inkFaint, fontFamily: "'IBM Plex Mono', monospace" }}>{p.count}</span></span>)}
+            </div>
+          </div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", gap: 6, justifyContent: "flex-end", position: "relative" }}>
+          <span style={{ fontSize: 10, color: Z.inkFaint, fontWeight: 700, letterSpacing: "0.06em", textTransform: "uppercase", textAlign: "right" }}>Ultimos 6 meses</span>
+          <svg width={W} height={H} style={{ overflow: "visible" }}>
+            <defs><linearGradient id="mrr-grad" x1="0" x2="0" y1="0" y2="1"><stop offset="0%" stopColor={Z.green} stopOpacity="0.25" /><stop offset="100%" stopColor={Z.green} stopOpacity="0" /></linearGradient></defs>
+            <path d={area} fill="url(#mrr-grad)" />
+            <path d={path} fill="none" stroke={Z.green} strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+            {pts.map((p, i) => <circle key={i} cx={p[0]} cy={p[1]} r={i === pts.length - 1 ? 3 : 1.5} fill={i === pts.length - 1 ? Z.green : Z.surface} stroke={Z.green} strokeWidth="1.2" />)}
+          </svg>
+          <button onClick={onDrill} style={{ alignSelf: "flex-end", marginTop: 4, background: "transparent", border: "none", color: Z.primary, fontSize: 11, fontWeight: 700, cursor: "pointer", padding: 0, display: "inline-flex", alignItems: "center", gap: 4 }}>Ver detalle <Icon name="arrow" size={11} /></button>
+        </div>
       </div>
     </Card>
   );
@@ -158,7 +264,13 @@ export default function AukenAdmin() {
     }
   };
 
-  const totalMRR = opticas.filter(o => o.status === "active").reduce((s, o) => s + (o.config?.mensualidad || 0), 0);
+  const activeOpticas = opticas.filter(o => o.status === "active");
+  const suspendedOpticas = opticas.filter(o => o.status !== "active");
+  const totalMRR = activeOpticas.reduce((s, o) => s + Number(o.config?.mensualidad || 0), 0);
+  const mrrSeries = buildMrrSeries(opticas);
+  const mrrPrev = mrrSeries.length > 1 ? mrrSeries[mrrSeries.length - 2] : totalMRR;
+  const planBreakdown = buildPlanBreakdown(opticas);
+  const churnPct = opticas.length ? (suspendedOpticas.length / opticas.length) * 100 : 0;
 
   if (!authed) {
     return (
@@ -218,11 +330,19 @@ export default function AukenAdmin() {
       </header>
 
       {/* METRICS ZEN */}
-      <div style={{ display: "flex", gap: 20, marginBottom: 40 }}>
-        <KPIZen icon="💵" label="MRR TOTAL" value={`$${totalMRR.toLocaleString("es-CL")}`} color={Z.green} glow />
+      <MrrHeroCard
+        mrr={totalMRR}
+        mrrPrev={mrrPrev}
+        series={mrrSeries}
+        payingOpticas={activeOpticas.length}
+        plans={planBreakdown}
+        churnPct={churnPct}
+        onDrill={() => alert("Detalle financiero pronto: aqui conectaremos billing, cohortes y expansion MRR.")}
+      />
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, minmax(0, 1fr))", gap: 16, marginBottom: 40 }}>
         <KPIZen icon="🏢" label="ÓPTICAS" value={opticas.length} color={Z.neon} />
-        <KPIZen icon="✅" label="ACTIVAS" value={opticas.filter(o => o.status === "active").length} color={Z.green} />
-        <KPIZen icon="🚫" label="SUSPENDIDAS" value={opticas.filter(o => o.status !== "active").length} color={Z.red} />
+        <KPIZen icon="✅" label="ACTIVAS" value={activeOpticas.length} color={Z.green} />
+        <KPIZen icon="🚫" label="SUSPENDIDAS" value={suspendedOpticas.length} color={Z.red} />
       </div>
 
       {/* CLIENTS ZEN */}
