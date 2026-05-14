@@ -1,6 +1,7 @@
 import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { supabase } from "../lib/supabase";
+import { buildTenantPath, setStoredOpticaSlug, slugFromOptica } from "../lib/tenant";
 import ConfirmDialog from "../components/ConfirmDialog";
 import Icon from "../components/Icon";
 
@@ -226,6 +227,38 @@ export default function AukenAdmin() {
     if (!suspending) return;
     await toggleStatus(suspending.id, suspending.status);
     setSuspending(null);
+  };
+
+  const ensurePartnerOptica = async (optica) => {
+    const slug = slugFromOptica(optica);
+    const { data: existing } = await supabase.from("opticas").select("id").eq("slug", slug).maybeSingle();
+    if (existing?.id) return slug;
+
+    const { error } = await supabase.from("opticas").insert({
+      slug,
+      nombre: optica.optica_name || optica.nombre || slug,
+      ciudad: optica.city || "",
+      telefono: optica.phone || "",
+      whatsapp: optica.phone || "",
+      horario: "Lun-Vie 9:00-19:00, Sab 10:00-14:00",
+      bot_nombre: (optica.optica_name || "Auken").split(" ")[0],
+      promocion_estrella: "",
+      servicios: [],
+      escalar_si: [],
+    });
+    if (error) throw new Error(error.message);
+    return slug;
+  };
+
+  const openPartnerWorkspace = async (optica, target) => {
+    try {
+      const slug = await ensurePartnerOptica(optica);
+      setStoredOpticaSlug(slug);
+      localStorage.setItem("auken_auth", "true");
+      navigate(buildTenantPath(target, slug));
+    } catch (err) {
+      alert("No se pudo preparar la óptica: " + err.message);
+    }
   };
 
   const purgeDemoData = async () => {

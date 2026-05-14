@@ -1,9 +1,10 @@
 import { useState, useEffect, useCallback, useRef } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useToaster } from "../components/Toaster";
 import Icon from "../components/Icon";
 import { formatRut, formatVisit, labelMeta, sanitizeNotas } from "../lib/labels";
+import { buildTenantPath, getOpticaSlugFromSearch, setStoredOpticaSlug } from "../lib/tenant";
 
 // Hook responsive - detecta tamaño de pantalla
 function useViewport() {
@@ -72,9 +73,10 @@ const QUICK_REPLIES = [
 // -- Helpers -------------------------------------------------------------------
 const DASHBOARD_PATH = "/optica/dashboard";
 
-function dashboardUrl() {
-  if (typeof window === "undefined") return DASHBOARD_PATH;
-  return `${window.location.origin}${DASHBOARD_PATH}`;
+function dashboardUrl(slug, params = {}) {
+  const path = buildTenantPath(DASHBOARD_PATH, slug, params);
+  if (typeof window === "undefined") return path;
+  return `${window.location.origin}${path}`;
 }
 
 function goDashboard(e) {
@@ -684,6 +686,8 @@ function PatientPanel({ p, onClose, onGoToDashboard }) {
 // -- Componente principal ------------------------------------------------------
 export default function AukenOptica() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const activeOpticaSlug = getOpticaSlugFromSearch(searchParams);
   const bottomRef  = useRef(null);
   const inputRef   = useRef(null);
   const sendingRef = useRef(false);
@@ -691,6 +695,7 @@ export default function AukenOptica() {
   const { toast } = useToaster();
   const [showSidebar, setShowSidebar] = useState(false); // móvil: drawer cerrado por defecto
 
+  const [optica,    setOptica]    = useState(null);
   const [activeP,   setActiveP]   = useState(null);
   const [patients,  setPatients]  = useState([]);
   const [messages,  setMessages]  = useState([]);
@@ -708,24 +713,60 @@ export default function AukenOptica() {
   const [showQuick,  setShowQuick]  = useState(false);
   const [newMsgAlert, setNewMsgAlert] = useState(null); // nombre del paciente con msg nuevo
 
+  useEffect(() => {
+    setStoredOpticaSlug(activeOpticaSlug);
+  }, [activeOpticaSlug]);
+
   const openDashboard = useCallback((e, patientId = null) => {
     e?.preventDefault?.();
     e?.stopPropagation?.();
     try {
       localStorage.setItem("auken_auth", "true");
     } catch {}
-    navigate(`${DASHBOARD_PATH}${patientId ? `?patient=${patientId}` : ""}`);
-  }, [navigate]);
+    navigate(buildTenantPath(DASHBOARD_PATH, activeOpticaSlug, patientId ? { patient: patientId } : {}));
+  }, [activeOpticaSlug, navigate]);
   const [testMode,   setTestMode]   = useState(false);  // simula ser cliente, IA responde
   const [iaThinking, setIaThinking] = useState(false);
   const [creandoDemo, setCreandoDemo] = useState(false);
 
-  // -- Carga pacientes ----------------------------------------------------------
+  // -- Carga pacientes aislados por óptica --------------------------------------
   const refresh = useCallback(async () => {
-    const { data: pacs } = await supabase.from("pacientes").select("*").order("created_at", { ascending: false });
-    if (!pacs) return;
-    setPatients(pacs);
-    const ids = pacs.map(p => p.id);
+    const { data: opticaRow, error: opticaError } = await supabase
+      .from("opticas")
+      .select("*")
+      .eq("slug", activeOpticaSlug)
+      .maybeSingle();
+
+    if (opticaError) {
+      console.error("[monitor] Error cargando óptica:", opticaError.message);
+      setLoading(false);
+      return;
+    }
+
+    setOptica(opticaRow || null);
+    if (!opticaRow?.id) {
+      setPatients([]);
+      setLastMsgs({});
+      setUnreadMap({});
+      setLoading(false);
+      return;
+    }
+
+    const { data: pacs, error: pacError } = await supabase
+      .from("pacientes")
+      .select("*")
+      .eq("optica_id", opticaRow.id)
+      .order("created_at", { ascending: false });
+
+    if (pacError) {
+      console.error("[monitor] Error cargando pacientes:", pacError.message);
+      setLoading(false);
+      return;
+    }
+
+    const scopedPatients = pacs || [];
+    setPatients(scopedPatients);
+    const ids = scopedPatients.map(p => p.id);
     if (ids.length) {
       const { data: msgs } = await supabase
         .from("mensajes_chat").select("paciente_id, contenido, remitente, created_at")
@@ -743,9 +784,12 @@ export default function AukenOptica() {
         setLastMsgs(lm);
         setUnreadMap(uc);
       }
+    } else {
+      setLastMsgs({});
+      setUnreadMap({});
     }
     setLoading(false);
-  }, []);
+  }, [activeOpticaSlug]);
 
   // -- Demo: crear cliente placeholder para probar el flujo de registro IA -----
   const crearDemoCliente = useCallback(async () => {
@@ -753,7 +797,7 @@ export default function AukenOptica() {
     try {
       // Buscar la óptica para obtener optica_id
       const { data: opticaRow } = await supabase.from("opticas")
-        .select("id").eq("slug", "glowvision").maybeSingle();
+        .select("id").eq("slug", activeOpticaSlug).maybeSingle();
 
       const fakePhone = `+5690000${String(Math.floor(Math.random() * 9000) + 1000)}`;
       const { data: nuevo, error } = await supabase.from("pacientes").insert({
@@ -781,7 +825,7 @@ export default function AukenOptica() {
     } finally {
       setCreandoDemo(false);
     }
-  }, [toast]);
+  }, [activeOpticaSlug, toast]);
 
   // -- Carga chat ---------------------------------------------------------------
   const loadChat = useCallback(async (pId) => {
@@ -848,7 +892,7 @@ export default function AukenOptica() {
       })
       .subscribe();
     return () => supabase.removeChannel(sub);
-  }, [activeP, refresh]);
+  }, [activeP, refresh, toast]);
 
   // -- Enviar -------------------------------------------------------------------
   const handleSend = async () => {
@@ -884,7 +928,7 @@ export default function AukenOptica() {
             pacienteId: activeP.id,
             phone: activeP.telefono || "test-dashboard",
             canal: "dashboard-test",
-            opticaSlug: "glowvision",
+            opticaSlug: activeOpticaSlug,
           }),
         });
         const data = await res.json();
@@ -1063,7 +1107,7 @@ export default function AukenOptica() {
           )}
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-          <a href={DASHBOARD_PATH} onClick={openDashboard}
+          <a href={buildTenantPath(DASHBOARD_PATH, activeOpticaSlug)} onClick={openDashboard}
             style={{ background: `${C.primary}15`, color: C.primary, border: `1px solid ${C.primary}30`, borderRadius: 6, padding: "5px 12px", fontSize: 11, fontWeight: 700, cursor: "pointer", display: "inline-flex", alignItems: "center", textDecoration: "none", position: "relative", zIndex: 5 }}>
             <Icon name="metrics" size={12} /> Dashboard
           </a>

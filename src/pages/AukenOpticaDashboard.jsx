@@ -1,11 +1,12 @@
 import { useState, useEffect, useCallback, useMemo, useRef, memo } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import { supabase } from "../lib/supabase";
 import { useToaster } from "../components/Toaster";
 import { useViewport } from "../lib/useViewport";
 import Icon from "../components/Icon";
 import ConfirmDialog from "../components/ConfirmDialog";
 import { formatCitaDate, formatCLP, formatRut, formatVisit, labelMeta, recetaStateFromLastVisit, sanitizeNotas } from "../lib/labels";
+import { buildTenantPath, getOpticaSlugFromSearch, setStoredOpticaSlug, slugFromOptica } from "../lib/tenant";
 
 // =============================================================
 // AUKÉN OPTICA DASHBOARD - versión limpia
@@ -118,6 +119,35 @@ function makeSeries(end, n = 7) {
     return Math.max(0, Math.round(v * (0.72 + t * 0.28) + Math.sin(i * 1.3) * v * 0.06));
   });
 }
+
+function makeRevenueBars(total, n = 12) {
+  const labels = n === 12
+    ? ["Ene", "Feb", "Mar", "Abr", "May", "Jun", "Jul", "Ago", "Sep", "Oct", "Nov", "Dic"]
+    : ["L", "M", "M", "J", "V", "S", "D"];
+  const amount = Math.max(Number(total || 0), 0);
+  const base = amount > 0 ? amount / labels.length : 0;
+  const multipliers = [0.78, 1.08, 0.92, 0.74, 1.18, 0.96, 1.10, 0.88, 0.82, 0.76, 0.98, 1.22];
+  return labels.slice(0, n).map((label, i) => {
+    const value = Math.max(0, Math.round(base * (multipliers[i % multipliers.length] || 1)));
+    const previous = Math.max(1, Math.round(value / (0.88 + ((i % 4) * 0.08))));
+    const delta = value ? Math.round(((value - previous) / previous) * 100) : 0;
+    return { label, value, delta };
+  });
+}
+
+function buildStatsFallback(pacientes = [], citas = []) {
+  const today = new Date().toISOString().slice(0, 10);
+  return {
+    total_pacientes: pacientes.length,
+    recetas_vigentes: pacientes.filter(p => recetaStateFromLastVisit(p.ultima_visita || p.ultimaVisita) === "vigente").length,
+    recetas_proximas: pacientes.filter(p => recetaStateFromLastVisit(p.ultima_visita || p.ultimaVisita) === "por_vencer").length,
+    recetas_vencidas: pacientes.filter(p => recetaStateFromLastVisit(p.ultima_visita || p.ultimaVisita) === "vencida").length,
+    conversaciones_24h: 0,
+    citas_proximas: citas.filter(c => (c.fecha || "") >= today && c.estado !== "cancelada").length,
+    ventas_total_clp: pacientes.reduce((sum, p) => sum + Number(p.monto_ultima || p.montoUltima || p.total_ventas || 0), 0),
+  };
+}
+
 
 // KPI con delta pill + sparkline SVG - reemplaza el KPI anterior
 function KpiCard({ label, value, sub, delta, accent = C.text, series = [], glow, icon }) {
@@ -261,55 +291,80 @@ function LocalPeriodPill({ value, onChange }) {
   );
 }
 
-function BrandedBarChart({ data = [] }) {
-  const nums = data.map(Number).filter(n => !Number.isNaN(n));
-  const max = Math.max(...nums, 1);
-  const labels = ["L", "M", "M", "J", "V", "S", "D"];
+function BrandedBarChart({ data = [], height = 120, gap = 12 }) {
+  const [hover, setHover] = useState(null);
+  const rows = (data || []).map((d, i) => {
+    if (typeof d === "number") return { label: ["L", "M", "M", "J", "V", "S", "D"][i % 7], value: d, delta: null };
+    return d;
+  });
+  const max = Math.max(...rows.map(d => Number(d.value || 0)), 1);
+  const minBarHeight = 34;
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: `repeat(${nums.length || 1}, minmax(18px, 1fr))`, gap: 8, alignItems: "end", height: 112 }}>
-      {nums.map((v, i) => {
-        const h = Math.max(18, Math.round((v / max) * 86));
-        const hot = i === nums.length - 1 || i === nums.length - 3;
-        return (
-          <div key={i} style={{ height: "100%", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", gap: 6, position: "relative" }}>
-            {hot && (
-              <span style={{
-                position: "absolute",
-                top: Math.max(0, 72 - h),
-                fontSize: 10,
-                color: C.primary,
-                fontFamily: C.fontMono,
-                fontWeight: 800,
-                background: "rgba(249,115,22,0.10)",
-                border: "1px solid rgba(249,115,22,0.22)",
-                borderRadius: 999,
-                padding: "2px 6px",
-                transform: "translateY(-18px)",
-                whiteSpace: "nowrap",
-              }}>
-                +{i === nums.length - 1 ? 38 : 24}%
-              </span>
-            )}
-            <div style={{
-              width: "100%",
-              maxWidth: 34,
-              height: h,
-              borderRadius: "8px 8px 3px 3px",
-              background: hot
-                ? `linear-gradient(180deg, ${C.primaryH}, ${C.primary})`
-                : "linear-gradient(180deg, rgba(249,115,22,0.42), rgba(249,115,22,0.14))",
-              border: hot ? "1px solid rgba(249,115,22,0.44)" : "1px solid rgba(249,115,22,0.18)",
-              boxShadow: hot ? "0 10px 24px rgba(249,115,22,0.16)" : "none",
-            }} />
-            <span style={{ fontSize: 10, color: C.textMute, fontFamily: C.fontMono, fontWeight: 700 }}>{labels[i % labels.length]}</span>
-          </div>
-        );
-      })}
+    <div style={{ position: "relative", userSelect: "none" }}>
+      <div style={{ display: "flex", gap, alignItems: "flex-end", marginBottom: 7, height: 24 }}>
+        {rows.map((d, i) => {
+          const isActive = hover === null || hover === i;
+          const isPositive = Number(d.delta || 0) >= 0;
+          return (
+            <div key={i} style={{ flex: 1, display: "flex", justifyContent: "center", minWidth: 0 }}>
+              {typeof d.delta === "number" && d.delta !== 0 && (
+                <span style={{
+                  fontSize: 10, fontWeight: 800, fontFamily: C.fontMono,
+                  color: isPositive ? C.green : C.red,
+                  background: isPositive ? C.greenSoft : C.redSoft,
+                  border: "1px solid " + (isPositive ? "rgba(52,211,153,0.22)" : "rgba(248,113,113,0.22)"),
+                  padding: "1px 5px", borderRadius: 999,
+                  fontVariantNumeric: "tabular-nums",
+                  opacity: isActive ? 1 : 0.38,
+                  transition: "opacity " + C.dur + " " + C.ease,
+                  whiteSpace: "nowrap",
+                }}>
+                  {isPositive ? "+" : ""}{d.delta}%
+                </span>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ display: "flex", gap, alignItems: "flex-end", height, position: "relative" }}>
+        {rows.map((d, i) => {
+          const value = Number(d.value || 0);
+          const barH = Math.max(minBarHeight, (value / max) * height);
+          const isHover = hover === i;
+          const isDim = hover !== null && !isHover;
+          return (
+            <div key={i} style={{ flex: 1, display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "flex-end", minWidth: 0 }}>
+              <button type="button" onMouseEnter={() => setHover(i)} onMouseLeave={() => setHover(null)}
+                style={{
+                  width: "100%", maxWidth: 38, height: barH,
+                  background: isHover ? C.primaryH : C.primary,
+                  border: "1px solid rgba(249,115,22,0.32)", borderRadius: 10, cursor: "pointer", padding: 0,
+                  boxShadow: isHover ? "0 0 28px " + C.primary + "55, 0 14px 34px rgba(0,0,0,0.38)" : "inset 0 1px 0 rgba(255,255,255,0.16)",
+                  transform: isHover ? "translateY(-3px)" : "translateY(0)", transition: "all 200ms " + C.ease,
+                  opacity: isDim ? 0.34 : 1, position: "relative",
+                }} aria-label={d.label + ": " + formatCLP(value)}>
+                {isHover && (
+                  <div style={{ position: "absolute", bottom: "calc(100% + 10px)", left: "50%", transform: "translateX(-50%)", background: C.bg, border: "1px solid " + C.borderL, borderRadius: 8, padding: "7px 10px", boxShadow: "0 12px 28px rgba(0,0,0,0.55)", whiteSpace: "nowrap", zIndex: 5, pointerEvents: "none" }}>
+                    <div style={{ fontSize: 10, color: C.textDim, marginBottom: 2, letterSpacing: "0.06em", textTransform: "uppercase" }}>{d.label}</div>
+                    <div style={{ fontSize: 13, fontWeight: 800, color: C.text, fontFamily: C.fontMono, fontVariantNumeric: "tabular-nums" }}>{formatCLP(value)}</div>
+                  </div>
+                )}
+              </button>
+            </div>
+          );
+        })}
+      </div>
+
+      <div style={{ display: "flex", gap, marginTop: 10 }}>
+        {rows.map((d, i) => (
+          <div key={i} style={{ flex: 1, textAlign: "center", fontSize: 10, color: C.textMute, fontFamily: C.fontMono, fontWeight: 800, letterSpacing: "0.06em", textTransform: "uppercase", opacity: hover === null || hover === i ? 1 : 0.4, transition: "opacity " + C.dur + " " + C.ease }}>{d.label}</div>
+        ))}
+      </div>
     </div>
   );
 }
-
 function VentasHero({ total, data }) {
   const [localPeriod, setLocalPeriod] = useState("Anual");
   const periods = ["Semanal", "Mensual", "Anual"];
@@ -2141,7 +2196,7 @@ function TabMetricas({ optica, stats }) {
 
       {/* Fila 2: ventas hero + actividad */}
       <div className="auken-revenue-row" style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.45fr) minmax(260px, 0.85fr)", gap: 12, alignItems: "stretch" }}>
-        <VentasHero total={ventas} data={makeSeries(ventas, 7)} />
+        <VentasHero total={ventas} data={makeRevenueBars(ventas, 12)} />
         <div style={{ display: "grid", gridTemplateRows: "1fr 1fr", gap: 12 }}>
           <KpiCard
             icon={<Icon name="chat" size={14} />} label="Conversaciones 24h" value={conv24} accent={C.blue}
@@ -3002,14 +3057,40 @@ function TabEnVivo({ citas, optica }) {
   const msgEndRef = useRef(null);
 
   const loadMensajes = useCallback(async () => {
+    if (!optica?.id) {
+      setMensajes([]);
+      setLoadingMsgs(false);
+      return;
+    }
+
+    const { data: scopedPatients, error: patientError } = await supabase
+      .from("pacientes")
+      .select("id")
+      .eq("optica_id", optica.id);
+
+    if (patientError) {
+      console.error("[TabEnVivo] Error cargando pacientes:", patientError.message);
+      setLoadError(patientError.message);
+      setLoadingMsgs(false);
+      return;
+    }
+
+    const ids = (scopedPatients || []).map(p => p.id);
+    if (!ids.length) {
+      setMensajes([]);
+      setLoadError(null);
+      setLoadingMsgs(false);
+      return;
+    }
+
     const { data, error } = await supabase
       .from("mensajes_chat")
       .select("id, paciente_id, remitente, contenido, created_at")
+      .in("paciente_id", ids)
       .order("created_at", { ascending: false })
       .limit(60);
 
     if (error) {
-      // Error más común: tabla no en realtime publication o columna faltante
       console.error("[TabEnVivo] Error cargando mensajes:", error.message);
       setLoadError(error.message);
       setLoadingMsgs(false);
@@ -3020,7 +3101,7 @@ function TabEnVivo({ citas, optica }) {
     setMensajes((data || []).reverse());
     setLoadingMsgs(false);
     setLiveCount(n => n + 1);
-  }, []);
+  }, [optica?.id]);
 
   useEffect(() => {
     loadMensajes();
@@ -3094,7 +3175,7 @@ function TabEnVivo({ citas, optica }) {
             >
               ↻
             </button>
-            <a href="/optica"
+            <a href={buildTenantPath("/optica", slugFromOptica(optica))}
               style={{ fontSize: 11, color: C.primary, fontWeight: 700, background: `${C.primary}15`, border: `1px solid ${C.primary}40`, borderRadius: 6, padding: "4px 10px", textDecoration: "none", display: "inline-flex", alignItems: "center" }}
             >
               Abrir monitor
@@ -3268,6 +3349,7 @@ function TabEnVivo({ citas, optica }) {
 // =============================================================
 export default function AukenOpticaDashboard() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const { isMobile, isTablet } = useViewport();
 
   // ⚠ FIX: Todos los useState ANTES de cualquier useEffect
@@ -3285,34 +3367,43 @@ export default function AukenOpticaDashboard() {
   const [citaDraft, setCitaDraft] = useState(null);
   const [commandOpen, setCommandOpen] = useState(false);
 
-  // Slug de la óptica (en F3 vendrá del usuario logueado)
-  const OPTICA_SLUG = "glowvision";
+  const activeOpticaSlug = getOpticaSlugFromSearch(searchParams);
 
-  // Carga inicial + refresh
+  useEffect(() => {
+    setStoredOpticaSlug(activeOpticaSlug);
+  }, [activeOpticaSlug]);
+
+  // Carga inicial + refresh aislado por óptica
   const refresh = useCallback(async () => {
     try {
-      const [opticaRes, pacientesRes, citasRes, statsRes] = await Promise.all([
-        supabase.from("opticas").select("*").eq("slug", OPTICA_SLUG).maybeSingle(),
-        supabase.from("pacientes").select("*").order("created_at", { ascending: false, nullsFirst: false }),
-        supabase.from("citas").select("*").order("fecha", { ascending: true, nullsFirst: false }).limit(100),
-        supabase.from("estadisticas_optica").select("*").eq("slug", OPTICA_SLUG).maybeSingle(),
+      setError(null);
+      const opticaRes = await supabase.from("opticas").select("*").eq("slug", activeOpticaSlug).maybeSingle();
+      if (opticaRes.error) throw new Error("No se cargó la óptica: " + opticaRes.error.message);
+      if (!opticaRes.data) throw new Error("Óptica no encontrada: " + activeOpticaSlug);
+
+      const opticaId = opticaRes.data.id;
+      const [pacientesRes, citasRes, statsRes] = await Promise.all([
+        supabase.from("pacientes").select("*").eq("optica_id", opticaId).order("created_at", { ascending: false, nullsFirst: false }),
+        supabase.from("citas").select("*").eq("optica_id", opticaId).order("fecha", { ascending: true, nullsFirst: false }).limit(100),
+        supabase.from("estadisticas_optica").select("*").eq("slug", activeOpticaSlug).maybeSingle(),
       ]);
 
-      if (opticaRes.error) throw new Error("No se cargó la óptica: " + opticaRes.error.message);
-      if (!opticaRes.data) throw new Error("Óptica no encontrada. ¿Corriste la migración 002?");
+      if (pacientesRes.error) throw new Error("No se cargaron pacientes: " + pacientesRes.error.message);
+      if (citasRes.error) throw new Error("No se cargaron citas: " + citasRes.error.message);
 
+      const scopedPatients = pacientesRes.data || [];
+      const scopedCitas = citasRes.data || [];
       setOptica(opticaRes.data);
-      setPacientes(pacientesRes.data || []);
-      setCitas(citasRes.data || []);
-      setStats(statsRes.data);
+      setPacientes(scopedPatients);
+      setCitas(scopedCitas);
+      setStats(statsRes.data || buildStatsFallback(scopedPatients, scopedCitas));
       setLoading(false);
     } catch (err) {
       console.error("[dashboard] Error:", err);
       setError(err.message);
       setLoading(false);
     }
-  }, []);
-
+  }, [activeOpticaSlug]);
   // ✓ useEffect DESPUÉS de useState (sin TDZ)
   useEffect(() => { refresh(); }, [refresh]);
 
@@ -3410,7 +3501,7 @@ export default function AukenOpticaDashboard() {
           { id: "patients", icon: <Icon name="users" size={13} />, label: "Pacientes", subtitle: `${pacientes.length}`, shortcut: "G P", run: () => setTab("pacientes") },
           { id: "citas", icon: <Icon name="calendar" size={13} />, label: "Citas", subtitle: pendingCitas ? `${pendingCitas} pendientes` : `${citas.length}`, shortcut: "G C", run: () => setTab("citas") },
           { id: "config", icon: <Icon name="settings" size={13} />, label: "Configuración", shortcut: "G S", run: () => setTab("config") },
-          { id: "monitor", icon: <Icon name="chat" size={13} />, label: "Abrir monitor de chat", shortcut: "G O", run: () => navigate("/optica") },
+          { id: "monitor", icon: <Icon name="chat" size={13} />, label: "Abrir monitor de chat", shortcut: "G O", run: () => navigate(buildTenantPath("/optica", activeOpticaSlug)) },
         ],
       },
       {
@@ -3433,7 +3524,7 @@ export default function AukenOpticaDashboard() {
         })),
       },
     ];
-  }, [citas, navigate, openCitaModal, openEditPatient, openNewPatient, pacientes]);
+  }, [activeOpticaSlug, citas, navigate, openCitaModal, openEditPatient, openNewPatient, pacientes]);
 
   // Acción WhatsApp - normaliza número chileno y abre wa.me
   // NO es async porque window.open necesita estar en el contexto directo del evento
@@ -3527,7 +3618,7 @@ export default function AukenOpticaDashboard() {
             style={{ background: C.surfaceL, border: `1px solid ${C.border}`, color: C.textDim, borderRadius: C.radius, padding: isMobile ? "5px 8px" : "5px 10px", fontSize: 11, fontWeight: 700, cursor: "pointer", fontFamily: C.fontMono, letterSpacing: 0 }}>
             {isMobile ? "⌘K" : "Ctrl/⌘K"}
           </button>
-          <button className="auken-touch" onClick={() => navigate("/optica")}
+          <button className="auken-touch" onClick={() => navigate(buildTenantPath("/optica", activeOpticaSlug))}
             title="Ir al monitor de conversaciones"
             style={{ background: C.primarySoft, border: `1px solid ${C.primaryRing}`, color: C.primary, borderRadius: C.radius, padding: isMobile ? "5px 10px" : "5px 12px", fontSize: 12, fontWeight: 600, cursor: "pointer", letterSpacing: '-0.01em', transition: `background ${C.dur} ${C.ease}` }}>
             <Icon name="chat" size={13} /> {isMobile ? "" : "Chat"}
